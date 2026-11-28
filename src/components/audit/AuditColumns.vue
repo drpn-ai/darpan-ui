@@ -88,26 +88,116 @@
             <span class="audit-tag" :class="{ 'audit-tag--hot': item.attention, 'audit-tag--empty': item.key === SOURCE_NOT_COVERED, 'audit-tag--running': item.key === SOURCE_RUNNING && !item.attention }">{{ item.tag }}</span>
           </button>
         </section>
+      </template>
 
-        <section class="audit-col audit-col--3 audit-col--detail" aria-label="Detail" data-testid="audit-source-detail">
-          <!-- DAR-UI-108. The deepest column's own content and the agent, one tab each, only when the agent is on. -->
-          <div v-if="agent && !wide" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
-            <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'false' : 'true'" data-testid="audit-tab-detail" @click="emit('agent', false)">{{ detailTabLabel }}</button>
-            <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'true' : 'false'" data-testid="audit-tab-agent" @click="emit('agent', true)">Agent</button>
+      <template v-else>
+        <section class="audit-col audit-col--2" aria-label="Statements">
+          <h2 class="micro-label audit-col-head"><span>Statements</span><span>{{ statements.length }}</span></h2>
+          <button
+            v-for="item in statements"
+            :key="item.id"
+            type="button"
+            class="audit-row audit-row--statement"
+            :class="{ 'audit-row--picked': item.id === statement, 'audit-row--quiet': item.tone === 'clean' }"
+            :aria-current="item.id === statement ? 'true' : undefined"
+            :aria-label="agentBeside ? `${item.id}, ${item.text}, ${item.badge}` : undefined"
+            :title="agentBeside ? item.text : undefined"
+            :data-testid="`audit-statement-row-${category}`"
+            @click="emit('navigate', { category, statement: item.id, finding: undefined })"
+          >
+            <span class="audit-row-code">{{ item.id }}</span>
+            <span class="audit-row-text">{{ item.text }}<span v-if="statementDraftTag(drafts?.changed[item.id])" class="audit-draft-tag audit-draft-tag--change" :data-testid="`audit-statement-draft-${item.id}`">{{ statementDraftTag(drafts?.changed[item.id]) }}</span></span>
+            <span class="audit-count" :class="`audit-count--${item.tone}`">{{ item.badge }}</span>
+          </button>
+          <!-- DAR-UI-109. A statement a waiting draft adds: drawn, not yet a row to open. -->
+          <div v-for="added in addedStatements" :key="`draft-${added.id}`" class="audit-row audit-row--statement audit-row--draft" data-testid="audit-statement-draft-new">
+            <span class="audit-row-code">{{ added.id }}</span>
+            <span class="audit-row-text">{{ added.text }}</span>
+            <span class="audit-draft-tag">draft</span>
           </div>
-          <!-- DAR-UI-145. Wide: the agent opens in its own column beside this one, so one switch, not two tabs. -->
-          <div v-if="agent && wide" class="audit-detail-tabs">
-            <button type="button" class="audit-detail-tab" :aria-pressed="agentOpen ? 'true' : 'false'" data-testid="audit-agent-toggle" @click="emit('agent', !agentOpen)">Agent</button>
+          <div v-if="!statements.length && !addedStatements.length" class="audit-empty" data-testid="audit-statements-empty">Nothing here for this filter</div>
+        </section>
+
+        <section class="audit-col audit-col--3" aria-label="Findings">
+          <h2 class="micro-label audit-col-head">
+            <span>Findings</span>
+            <span class="audit-col-head-end">
+              <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
+              <!-- DAR-UI-147. Re-check every open finding of this statement now; what was fixed since the morning closes. -->
+              <button v-if="canResolve && statement" type="button" class="app-icon-action" aria-label="Re-check all findings" title="Re-check all findings" data-testid="audit-recheck-statement" :disabled="rechecking" @click="emit('recheck', statement)">
+                <AppIcon name="recheck" />
+              </button>
+              <button v-if="rows.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
+                <AppIcon name="download" />
+              </button>
+            </span>
+          </h2>
+          <template v-for="({ item, key }, index) in rows" :key="key">
+            <!-- DAR-UI-089 (Aditi: "make the finding categories collapsable"). A cause's heading folds its findings.
+                 DAR-UI-098: orders too, each under its lines' causes. -->
+            <button
+              v-if="groupLabel(index)"
+              type="button"
+              class="audit-col-note audit-group-toggle"
+              :aria-expanded="!groupFolded(index)"
+              data-testid="audit-findings-group"
+              @click="toggleGroup(index)"
+            >
+              <span class="audit-row-chevron audit-group-chevron" aria-hidden="true">›</span>
+              <span>{{ groupLabel(index) }}</span>
+              <span class="audit-fold-count">{{ groupSize(index) }}</span>
+            </button>
+            <button
+              v-if="!groupFolded(index) || item.id === finding"
+              type="button"
+              class="audit-row audit-row--finding"
+              :class="{ 'audit-row--picked': item.id === finding, 'audit-row--closing': closing.has(item.id) }"
+              :aria-current="item.id === finding ? 'true' : undefined"
+              :title="item.id"
+              data-testid="audit-finding-row"
+              @click="emit('navigate', { category, statement, finding: item.id })"
+            >
+              <span class="audit-row-split">
+                <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
+                <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' && !rowAcknowledged(item) }">{{ rowAcknowledged(item) ? 'Acknowledged' : findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}<span v-if="closing.has(item.id)" class="audit-draft-tag" data-testid="audit-finding-closing"> · a draft closes it</span></span>
+              </span>
+              <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row names
+                   only the order's other causes. -->
+              <span v-if="rowAlsoLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-also">{{ rowAlsoLabel(rows[index]!) }}</span>
+              <!-- DAR-UI-144. An acknowledged row: who, when and the note's first line. -->
+              <span v-if="item.state === 'open' && item.acknowledgement" class="audit-row-sub" data-testid="audit-finding-ack">{{ ackRowLine(item.acknowledgement) }}</span>
+              <span class="sr-only">{{ item.id }}</span>
+            </button>
+          </template>
+          <div v-if="statementDoc && !rows.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
+            {{ statementEmpty }}
           </div>
-          <div v-if="agent && !wide" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="null" /></div>
-          <template v-if="!agentShown">
+          <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
+          <div v-if="more.loading && !narrowed" class="audit-empty" data-testid="audit-findings-loading">Loading...</div>
+        </section>
+      </template>
+
+      <!-- The deepest pick: on Run health the source, else the finding when one is open, else the statement and what checked it. -->
+      <section class="audit-col audit-col--detail" :class="isHealth ? 'audit-col--3' : 'audit-col--4'" aria-label="Detail" :data-testid="isHealth ? 'audit-source-detail' : undefined">
+        <!-- DAR-UI-108. Its own content and the agent, one tab each, only when the agent is on. -->
+        <div v-if="agent && !wide" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
+          <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'false' : 'true'" data-testid="audit-tab-detail" @click="emit('agent', false)">{{ detailTabLabel }}</button>
+          <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'true' : 'false'" data-testid="audit-tab-agent" @click="emit('agent', true)">Agent</button>
+        </div>
+        <!-- DAR-UI-145. Wide: the agent opens in its own column beside this one, so one switch, not two tabs. -->
+        <div v-if="agent && wide" class="audit-detail-tabs">
+          <button type="button" class="audit-detail-tab" :aria-pressed="agentOpen ? 'true' : 'false'" data-testid="audit-agent-toggle" @click="emit('agent', !agentOpen)">Agent</button>
+        </div>
+        <div v-if="agent && !wide" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="agentCard" /></div>
+        <template v-if="!agentShown">
+          <template v-if="isHealth">
             <!-- DAR-UI-085. A play in progress: each run, the checks it feeds, where it is and whether it looks right. -->
             <template v-if="source === SOURCE_RUNNING && progress">
               <h2 class="micro-label">Running now</h2>
               <p class="audit-lead" data-testid="audit-running-lead">{{ progress.activeChecks }} of {{ progress.checks }} checks</p>
               <p class="section-note">Findings arrive as each check finishes.</p>
               <!-- DAR-UI-096. Each run on the design-system card: its steps in run order, a bar only with a percent, its
-                 time against its usual only with one. A run that sends no steps keeps its one line. -->
+                   time against its usual only with one. A run that sends no steps keeps its one line. -->
               <article
                 v-for="run in progress.active"
                 :key="run.run"
@@ -208,108 +298,7 @@
               </dl>
             </template>
           </template>
-        </section>
-      </template>
-
-      <template v-else>
-        <section class="audit-col audit-col--2" aria-label="Statements">
-          <h2 class="micro-label audit-col-head"><span>Statements</span><span>{{ statements.length }}</span></h2>
-          <button
-            v-for="item in statements"
-            :key="item.id"
-            type="button"
-            class="audit-row audit-row--statement"
-            :class="{ 'audit-row--picked': item.id === statement, 'audit-row--quiet': item.tone === 'clean' }"
-            :aria-current="item.id === statement ? 'true' : undefined"
-            :aria-label="agentBeside ? `${item.id}, ${item.text}, ${item.badge}` : undefined"
-            :title="agentBeside ? item.text : undefined"
-            :data-testid="`audit-statement-row-${category}`"
-            @click="emit('navigate', { category, statement: item.id, finding: undefined })"
-          >
-            <span class="audit-row-code">{{ item.id }}</span>
-            <span class="audit-row-text">{{ item.text }}<span v-if="statementDraftTag(drafts?.changed[item.id])" class="audit-draft-tag audit-draft-tag--change" :data-testid="`audit-statement-draft-${item.id}`">{{ statementDraftTag(drafts?.changed[item.id]) }}</span></span>
-            <span class="audit-count" :class="`audit-count--${item.tone}`">{{ item.badge }}</span>
-          </button>
-          <!-- DAR-UI-109. A statement a waiting draft adds: drawn, not yet a row to open. -->
-          <div v-for="added in addedStatements" :key="`draft-${added.id}`" class="audit-row audit-row--statement audit-row--draft" data-testid="audit-statement-draft-new">
-            <span class="audit-row-code">{{ added.id }}</span>
-            <span class="audit-row-text">{{ added.text }}</span>
-            <span class="audit-draft-tag">draft</span>
-          </div>
-          <div v-if="!statements.length && !addedStatements.length" class="audit-empty" data-testid="audit-statements-empty">Nothing here for this filter</div>
-        </section>
-
-        <section class="audit-col audit-col--3" aria-label="Findings">
-          <h2 class="micro-label audit-col-head">
-            <span>Findings</span>
-            <span class="audit-col-head-end">
-              <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
-              <!-- DAR-UI-147. Re-check every open finding of this statement now; what was fixed since the morning closes. -->
-              <button v-if="canResolve && statement" type="button" class="app-icon-action" aria-label="Re-check all findings" title="Re-check all findings" data-testid="audit-recheck-statement" :disabled="rechecking" @click="emit('recheck', statement)">
-                <AppIcon name="recheck" />
-              </button>
-              <button v-if="rows.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
-                <AppIcon name="download" />
-              </button>
-            </span>
-          </h2>
-          <template v-for="({ item, key }, index) in rows" :key="key">
-            <!-- DAR-UI-089 (Aditi: "make the finding categories collapsable"). A cause's heading folds its findings.
-                 DAR-UI-098: orders too, each under its lines' causes. -->
-            <button
-              v-if="groupLabel(index)"
-              type="button"
-              class="audit-col-note audit-group-toggle"
-              :aria-expanded="!groupFolded(index)"
-              data-testid="audit-findings-group"
-              @click="toggleGroup(index)"
-            >
-              <span class="audit-row-chevron audit-group-chevron" aria-hidden="true">›</span>
-              <span>{{ groupLabel(index) }}</span>
-              <span class="audit-fold-count">{{ groupSize(index) }}</span>
-            </button>
-            <button
-              v-if="!groupFolded(index) || item.id === finding"
-              type="button"
-              class="audit-row audit-row--finding"
-              :class="{ 'audit-row--picked': item.id === finding, 'audit-row--closing': closing.has(item.id) }"
-              :aria-current="item.id === finding ? 'true' : undefined"
-              :title="item.id"
-              data-testid="audit-finding-row"
-              @click="emit('navigate', { category, statement, finding: item.id })"
-            >
-              <span class="audit-row-split">
-                <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
-                <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' && !rowAcknowledged(item) }">{{ rowAcknowledged(item) ? 'Acknowledged' : findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}<span v-if="closing.has(item.id)" class="audit-draft-tag" data-testid="audit-finding-closing"> · a draft closes it</span></span>
-              </span>
-              <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row names
-                   only the order's other causes. -->
-              <span v-if="rowAlsoLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-also">{{ rowAlsoLabel(rows[index]!) }}</span>
-              <!-- DAR-UI-144. An acknowledged row: who, when and the note's first line. -->
-              <span v-if="item.state === 'open' && item.acknowledgement" class="audit-row-sub" data-testid="audit-finding-ack">{{ ackRowLine(item.acknowledgement) }}</span>
-              <span class="sr-only">{{ item.id }}</span>
-            </button>
-          </template>
-          <div v-if="statementDoc && !rows.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ statementEmpty }}
-          </div>
-          <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
-          <div v-if="more.loading && !narrowed" class="audit-empty" data-testid="audit-findings-loading">Loading...</div>
-        </section>
-
-        <section class="audit-col audit-col--4 audit-col--detail" aria-label="Detail">
-          <!-- The deepest pick: the finding when one is open, else the statement and what checked it. -->
-          <!-- DAR-UI-108. Its own content and the agent, one tab each, only when the agent is on. -->
-          <div v-if="agent && !wide" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
-            <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'false' : 'true'" data-testid="audit-tab-detail" @click="emit('agent', false)">{{ detailTabLabel }}</button>
-            <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'true' : 'false'" data-testid="audit-tab-agent" @click="emit('agent', true)">Agent</button>
-          </div>
-          <!-- DAR-UI-145. Wide: the agent opens in its own column beside this one, so one switch, not two tabs. -->
-          <div v-if="agent && wide" class="audit-detail-tabs">
-            <button type="button" class="audit-detail-tab" :aria-pressed="agentOpen ? 'true' : 'false'" data-testid="audit-agent-toggle" @click="emit('agent', !agentOpen)">Agent</button>
-          </div>
-          <div v-if="agent && !wide" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="agentCard" /></div>
-          <template v-if="!agentShown">
+          <template v-else>
             <template v-if="finding">
               <p v-if="findingLoading" class="section-note">Loading finding...</p>
               <InlineValidation v-if="findingError" tone="error" :message="findingError" data-testid="audit-finding-error" />
@@ -321,14 +310,7 @@
                     <!-- DAR-UI-144. Feedback to Darpan on this statement and cause: recent notes and a box to send one. -->
                     <AuditFeedbackBubble :finding-id="ackTarget" :record-label="feedbackRecord" :count="findingDoc.finding.feedback?.recentCount ?? 0" />
                     <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
-                    <span v-if="canAcknowledge" class="audit-ack-anchor" @keydown.esc="closeAck">
-                      <button ref="ackButton" type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" aria-haspopup="dialog" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
-                        <AppIcon name="acknowledge" />
-                      </button>
-                      <Transition name="audit-ack-pop">
-                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :initial="null" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="closeAck" />
-                      </Transition>
-                    </span>
+                    <AuditAcknowledgePopover v-if="canAcknowledge" ref="ackNew" :initial="null" :remind-days="remindDays" :open="ackEditing === 'new'" @toggle="toggleAck('new')" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="ackEditing = null" />
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
                     <button v-if="canResolve && findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
                       <AppIcon name="resolve" />
@@ -344,14 +326,7 @@
                   <div class="audit-detail-head">
                     <span class="audit-row-sub">{{ ackCardLine }}</span>
                     <span class="audit-col-head-end">
-                      <span class="audit-ack-anchor" @keydown.esc="closeAck">
-                        <button ref="ackEditButton" type="button" class="app-icon-action" aria-label="Edit acknowledgement" title="Edit acknowledgement" data-testid="audit-ack-edit" aria-haspopup="dialog" :aria-expanded="ackEditing === 'edit' ? 'true' : 'false'" @click="toggleAck('edit')">
-                          <AppIcon name="edit" />
-                        </button>
-                        <Transition name="audit-ack-pop">
-                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :initial="acknowledgement" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="closeAck" />
-                        </Transition>
-                      </span>
+                      <AuditAcknowledgePopover ref="ackEdit" :initial="acknowledgement" :remind-days="remindDays" :open="ackEditing === 'edit'" @toggle="toggleAck('edit')" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="ackEditing = null" />
                       <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" @click="reopenAck">Reopen</button>
                     </span>
                   </div>
@@ -361,14 +336,14 @@
                 <InlineValidation v-if="ackError" tone="error" :message="ackError" data-testid="audit-ack-error" />
 
                 <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
-                   DAR-UI-092: the record's own facts sit between the title and the verdict. -->
+                     DAR-UI-092: the record's own facts sit between the title and the verdict. -->
                 <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow">{{ eyebrow }}</p>
                 <!-- DAR-UI-140. Where the level came from: its statement, or the cause it was set on. -->
                 <p v-if="levelLine" class="audit-row-sub audit-eyebrow" data-testid="audit-finding-level">{{ levelLine }}</p>
                 <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
 
                 <!-- DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each
-                   system the check compared and its status, the amount, the day. -->
+                     system the check compared and its status, the amount, the day. -->
                 <StaticFactStrip :facts="basics" test-id="audit-finding-basics" />
 
                 <dl v-if="money.length" class="audit-facts">
@@ -376,9 +351,9 @@
                 </dl>
 
                 <!-- DAR-UI-092 (Aditi: "not logically ordered"). The record the finding is about, under its title: then the verdict,
-                   then the records it sits among. -->
+                     then the records it sits among. -->
                 <!-- DAR-UI-139 ("based on type the detaisl are displayed slightly differently"): the rest of the record's
-                   facts under what it is, an order, a return or an exchange. -->
+                     facts under what it is, an order, a return or an exchange. -->
                 <h3 v-if="details.length" class="micro-label" data-testid="audit-record-kind">{{ kind }}</h3>
                 <dl v-if="details.length" class="audit-facts audit-records">
                   <div v-for="fact in details" :key="fact.key" data-testid="audit-record-detail">
@@ -388,7 +363,7 @@
                 </dl>
 
                 <!-- DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW"). An order
-                   finding's lines, each by SKU with every system's word for it; an order-line finding lists its lines below. -->
+                     finding's lines, each by SKU with every system's word for it; an order-line finding lists its lines below. -->
                 <template v-if="recordLines.length && !orderUnit?.lines?.length">
                   <h3 class="micro-label">Lines <span class="audit-fold-count">{{ recordLines.length }}</span></h3>
                   <ul class="audit-lines audit-lines--grid">
@@ -417,7 +392,7 @@
                 </div>
 
                 <!-- DAR-UI-081/092. A return held behind another: each record after the one it is made from, a missing one dashed,
-                   the return holding it outlined on the first missing step. -->
+                     the return holding it outlined on the first missing step. -->
                 <ol v-if="chain.length" class="audit-chain" aria-label="Where it stopped">
                   <li v-for="step in chain" :key="step.key" class="audit-chain-step" :class="{ 'audit-chain-step--missing': !step.present }" data-testid="audit-chain-step">
                     <span class="audit-chain-mark" aria-hidden="true" />
@@ -435,7 +410,7 @@
                 </ol>
 
                 <!-- DAR-UI-075. An order's lines: the one holding it up outlined. DAR-UI-081 (Aditi: "all info needed is already
-                   available, remove the click"): each line says what it is in place, so it opens nothing. -->
+                     available, remove the click"): each line says what it is in place, so it opens nothing. -->
                 <template v-if="orderUnit?.lines?.length">
                   <h3 class="micro-label">Lines <span class="audit-fold-count">{{ orderUnit.lines.length + otherLines.length }}</span></h3>
                   <ul class="audit-lines">
@@ -452,7 +427,7 @@
                       <span class="audit-row-sub" data-testid="audit-line-location">{{ [lineFulfillments(line), lineLocation(line)].filter(Boolean).join(' · ') }}</span>
                     </li>
                     <!-- DAR-UI-099 (Aditi: "always make sure all lines are present within the order... a store credit line item
-                       is added"): the order's other lines, with no finding of their own, after the lines that have one. -->
+                         is added"): the order's other lines, with no finding of their own, after the lines that have one. -->
                     <li
                       v-for="other in otherLines"
                       :key="`other-${other.item}`"
@@ -563,8 +538,8 @@
 
             <div v-else class="audit-empty">Pick a statement</div>
           </template>
-        </section>
-      </template>
+        </template>
+      </section>
 
       <!-- DAR-UI-145. Wide: the agent beside the detail. Hidden, not removed, when switched off, so the thread stays. -->
       <section v-if="agent && wide" v-show="agentOpen" class="audit-col audit-col--detail audit-col--agent" aria-label="Agent" data-testid="audit-agent-column">
@@ -575,8 +550,8 @@
 </template>
 
 <script setup lang="ts">
-import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
 import AuditFeedbackBubble from './AuditFeedbackBubble.vue'
@@ -1019,19 +994,11 @@ function ackRowLine(ack: AuditAcknowledgement): string {
 function toggleAck(kind: 'new' | 'edit'): void {
   ackEditing.value = ackEditing.value === kind ? null : kind
 }
-// Focus never falls to the page: a closed popover hands it back to its trigger (unless a press outside sent it elsewhere),
-// a save to the pencil (the Acknowledge icon is gone), a reopen to the Acknowledge icon (the pencil is gone).
-const ackButton = ref<HTMLButtonElement | null>(null)
-const ackEditButton = ref<HTMLButtonElement | null>(null)
-function closeAck(): void {
-  const trigger = ackEditing.value === 'edit' ? ackEditButton : ackButton
-  ackEditing.value = null
-  void nextTick(() => {
-    const active = document.activeElement
-    if (!active || active === document.body || trigger.value?.parentElement?.contains(active)) trigger.value?.focus()
-  })
-}
-function focusAfterRender(target: typeof ackButton): void {
+// Focus never falls to the page: Esc or a press outside hands it back to the trigger (AuditPopover), a save to the pencil
+// (the Acknowledge icon is gone), a reopen to the Acknowledge icon (the pencil is gone).
+const ackNew = ref<InstanceType<typeof AuditAcknowledgePopover> | null>(null)
+const ackEdit = ref<InstanceType<typeof AuditAcknowledgePopover> | null>(null)
+function focusAfterRender(target: typeof ackNew): void {
   void nextTick(() => target.value?.focus())
 }
 // DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing"). Acknowledge, change and Reopen
@@ -1089,12 +1056,12 @@ function submitAck(kind: 'new' | 'edit', note: string, remind: boolean): void {
   })
   showAck(id, next, () => (kind === 'edit' ? auditFacade.updateAcknowledgement(id, note, remind)
     : auditFacade.acknowledgeFinding(id, note, remind)), 'The note did not save. Try again.')
-  focusAfterRender(ackEditButton)
+  focusAfterRender(ackEdit)
 }
 function reopenAck(): void {
   const id = ackTarget.value
   showAck(id, null, () => auditFacade.reopenAcknowledgement(id), 'Reopen did not go through. Try again.')
-  focusAfterRender(ackButton)
+  focusAfterRender(ackNew)
 }
 
 const sinceLine = computed(() => {
@@ -1283,7 +1250,6 @@ function statementText(id: string): string {
   letter-spacing: inherit;
   text-transform: inherit;
   cursor: pointer;
-  transition: color var(--motion-base) var(--ease-out);
 }
 
 .audit-by-choice:hover,
@@ -1345,11 +1311,6 @@ function statementText(id: string): string {
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-1);
-}
-
-/* In a column row, flex: 1 would size the headline from zero and clamp it away. */
-.audit-row--finding .audit-row-text {
-  flex: none;
 }
 
 .audit-row-main {
@@ -1419,7 +1380,6 @@ function statementText(id: string): string {
 
 .audit-group-chevron {
   transform: rotate(90deg);
-  transition: transform var(--motion-base) var(--ease-in-out);
 }
 
 .audit-group-toggle[aria-expanded='false'] .audit-group-chevron {
@@ -1663,26 +1623,6 @@ function statementText(id: string): string {
   gap: var(--space-2);
 }
 
-/* DAR-UI-144. The acknowledge popover hangs from its trigger and scales from it; the exit is the shorter one. */
-.audit-ack-anchor {
-  position: relative;
-  display: inline-flex;
-}
-
-.audit-ack-pop-enter-active {
-  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
-}
-
-.audit-ack-pop-leave-active {
-  transition: opacity var(--motion-exit) var(--ease-out), transform var(--motion-exit) var(--ease-out);
-}
-
-.audit-ack-pop-enter-from,
-.audit-ack-pop-leave-to {
-  opacity: 0;
-  transform: scale(var(--motion-enter-scale));
-}
-
 .audit-ack-card {
   display: grid;
   gap: var(--space-1);
@@ -1847,10 +1787,6 @@ function statementText(id: string): string {
 
 .audit-block {
   display: block;
-}
-
-.audit-nowrap {
-  white-space: nowrap;
 }
 
 /* A record's dt and dd sit in the list's grid; the wrapper only groups them for the test and a reader. */
@@ -2035,8 +1971,7 @@ function statementText(id: string): string {
 
 @media (prefers-reduced-motion: reduce) {
   .audit-columns-grid,
-  .audit-row,
-  .audit-group-chevron {
+  .audit-row {
     transition: none;
   }
 }

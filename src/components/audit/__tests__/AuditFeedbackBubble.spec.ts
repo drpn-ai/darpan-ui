@@ -59,6 +59,33 @@ describe('AuditFeedbackBubble', () => {
     expect(text).toContain('Darpan replies by email')
   })
 
+  // DAR-OPS-029 U05b. sentAt is written in the tenant's zone; the day is the tenant's, as the acknowledgement line reads
+  // it, not the browser's (10pm in Los Angeles is the next morning in India).
+  it('reads a note\'s day as the tenant wrote it, whatever zone the browser is in', async () => {
+    getFindingFeedback.mockResolvedValue({ ok: true, notes: [{ ...NOTES[0]!, sentAt: '2026-11-24T22:00:00-08:00' }], shownDays: 14 })
+    const w = mountBubble()
+    await w.get('[data-testid="audit-feedback"]').trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="audit-feedback-note"]').text()).toContain('Nov 24')
+    w.unmount()
+  })
+
+  // DAR-OPS-029 U05b. The notes asked for on one finding never land on the next one opened.
+  it('drops the notes of a finding the person has moved on from', async () => {
+    let answerFirst: (value: unknown) => void = () => {}
+    getFindingFeedback.mockReturnValueOnce(new Promise((resolve) => { answerFirst = resolve }))
+    getFindingFeedback.mockReturnValueOnce(new Promise(() => {}))
+    const w = mountBubble()
+    await w.get('[data-testid="audit-feedback"]').trigger('click')
+    await w.setProps({ findingId: 'F-2' })
+    await w.get('[data-testid="audit-feedback"]').trigger('click')
+    answerFirst({ ok: true, notes: NOTES, shownDays: 14 })
+    await flushPromises()
+    expect(getFindingFeedback).toHaveBeenLastCalledWith('F-2')
+    expect(w.findAll('[data-testid="audit-feedback-note"]')).toHaveLength(0)
+    w.unmount()
+  })
+
   it('shows no header and no sentence when there are no notes yet', async () => {
     getFindingFeedback.mockResolvedValue({ ok: true, notes: [], shownDays: 14 })
     const w = mountBubble(0)

@@ -15,8 +15,8 @@ const ACK: AuditAcknowledgement = {
   reminded: false,
 }
 
-function mountPopover(props: Partial<{ initial: AuditAcknowledgement | null; remindDays: number }> = {}) {
-  return mount(AuditAcknowledgePopover, { props: { initial: null, remindDays: 5, ...props } })
+function mountPopover(props: Partial<{ initial: AuditAcknowledgement | null; remindDays: number; open: boolean }> = {}) {
+  return mount(AuditAcknowledgePopover, { props: { initial: null, remindDays: 5, open: true, ...props } })
 }
 
 describe('AuditAcknowledgePopover', () => {
@@ -72,5 +72,31 @@ describe('AuditAcknowledgePopover', () => {
     const w = mountPopover()
     await w.get('[data-testid="audit-ack-popover"]').trigger('keydown', { key: 'Escape' })
     expect(w.emitted('close')).toHaveLength(1)
+  })
+
+  // DAR-OPS-029 U05b. The trigger is the Acknowledge icon, or the pencil with an acknowledgement in hand; closed, it keeps
+  // nothing open and leaves Esc to the page.
+  it('is the icon or the pencil, and a closed one leaves Esc to the page', async () => {
+    const closed = mountPopover({ open: false })
+    expect(closed.find('[data-testid="audit-ack-popover"]').exists()).toBe(false)
+    expect(closed.get('[data-testid="audit-acknowledge"]').attributes('aria-expanded')).toBe('false')
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    closed.get('[data-testid="audit-acknowledge"]').element.dispatchEvent(escape)
+    expect(escape.defaultPrevented).toBe(false)
+    expect(closed.emitted('close')).toBeUndefined()
+    await closed.get('[data-testid="audit-acknowledge"]').trigger('click')
+    expect(closed.emitted('toggle')).toHaveLength(1)
+
+    const pencil = mountPopover({ initial: ACK, open: false })
+    expect(pencil.get('[data-testid="audit-ack-edit"]').attributes('aria-label')).toBe('Edit acknowledgement')
+  })
+
+  // Each opening starts from the acknowledgement as it stands, not from what was typed and closed last time.
+  it('starts each opening afresh', async () => {
+    const w = mountPopover({ initial: ACK })
+    await w.get('[data-testid="audit-ack-note-input"]').setValue('half typed')
+    await w.setProps({ open: false })
+    await w.setProps({ open: true })
+    expect((w.get('[data-testid="audit-ack-note-input"]').element as HTMLTextAreaElement).value).toBe('Refunded')
   })
 })

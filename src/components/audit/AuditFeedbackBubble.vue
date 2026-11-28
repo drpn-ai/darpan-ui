@@ -1,50 +1,46 @@
 <template>
   <!-- DAR-UI-144. Feedback on a finding: the team's recent notes on the same statement and cause, and a box to send another.
-       A plain list, no replies and no statuses; Darpan answers by email. Anchored to its trigger and scaling from it. -->
-  <span class="audit-feedback-anchor" @keydown.esc="close">
-    <button
-      ref="trigger"
-      type="button"
-      class="app-icon-action audit-feedback-trigger"
-      :aria-label="triggerLabel"
-      :title="triggerLabel"
-      data-testid="audit-feedback"
-      aria-haspopup="dialog"
-      :aria-expanded="open ? 'true' : 'false'"
-      @click="toggle"
-    >
-      <AppIcon name="feedback" />
+       A plain list, no replies and no statuses; Darpan answers by email. -->
+  <AuditPopover
+    :open="open"
+    :label="triggerLabel"
+    icon="feedback"
+    test-id="audit-feedback"
+    dialog-label="Feedback"
+    dialog-test-id="audit-feedback-popover"
+    width="22rem"
+    @toggle="toggle"
+    @close="open = false"
+  >
+    <template #badge>
       <span v-if="shownCount > 0" class="audit-feedback-badge" data-testid="audit-feedback-badge" aria-hidden="true">{{ shownCount }}</span>
-    </button>
-    <Transition name="audit-feedback-pop">
-      <div v-if="open" ref="root" class="audit-feedback-popover" role="dialog" aria-label="Feedback" data-testid="audit-feedback-popover">
-        <InlineValidation v-if="loadError" tone="error" :message="loadError" data-testid="audit-feedback-load-error" />
-        <p v-if="notes.length" class="audit-feedback-heading" data-testid="audit-feedback-heading">Previous notes</p>
-        <ul v-if="notes.length" class="audit-feedback-list" aria-label="Previous notes">
-          <li v-for="item in notes" :key="item.feedbackId" class="audit-feedback-note" data-testid="audit-feedback-note">
-            <span class="audit-feedback-meta">{{ meta(item) }}</span>
-            <span class="audit-feedback-text">{{ item.note }}</span>
-          </li>
-        </ul>
-        <form class="audit-feedback-form" data-testid="audit-feedback-form" @submit.prevent="send">
-          <textarea ref="input" v-model="draft" class="audit-feedback-input" rows="2" aria-label="Feedback note" placeholder="What should Darpan know" data-testid="audit-feedback-input" />
-          <InlineValidation v-if="error" tone="error" :message="error" data-testid="audit-feedback-error" />
-          <div class="audit-feedback-foot">
-            <span class="audit-feedback-reply">Darpan replies by email</span>
-            <button type="submit" class="btn-primary audit-feedback-send" :disabled="!draft.trim() || sending" data-testid="audit-feedback-send">Send</button>
-          </div>
-        </form>
+    </template>
+    <InlineValidation v-if="loadError" tone="error" :message="loadError" data-testid="audit-feedback-load-error" />
+    <p v-if="notes.length" class="audit-feedback-heading" data-testid="audit-feedback-heading">Previous notes</p>
+    <ul v-if="notes.length" class="audit-feedback-list" aria-label="Previous notes">
+      <li v-for="item in notes" :key="item.feedbackId" class="audit-feedback-note" data-testid="audit-feedback-note">
+        <span class="audit-feedback-meta">{{ meta(item) }}</span>
+        <span class="audit-feedback-text">{{ item.note }}</span>
+      </li>
+    </ul>
+    <form class="audit-feedback-form" data-testid="audit-feedback-form" @submit.prevent="send">
+      <textarea v-model="draft" class="audit-feedback-input" rows="2" aria-label="Feedback note" placeholder="What should Darpan know" data-testid="audit-feedback-input" />
+      <InlineValidation v-if="error" tone="error" :message="error" data-testid="audit-feedback-error" />
+      <div class="audit-feedback-foot">
+        <span class="audit-feedback-reply">Darpan replies by email</span>
+        <button type="submit" class="btn-primary audit-feedback-send" :disabled="!draft.trim() || sending" data-testid="audit-feedback-send">Send</button>
       </div>
-    </Transition>
-  </span>
+    </form>
+  </AuditPopover>
 </template>
 
 <script setup lang="ts">
-import AppIcon from '../../components/ui/AppIcon.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
+import AuditPopover from './AuditPopover.vue'
 import { auditFacade } from '../../lib/api/facade'
 import type { AuditFeedbackNote } from '../../lib/api/auditTypes'
+import { shortDate } from '../../lib/auditReport'
 
 const props = defineProps<{
   findingId: string
@@ -62,10 +58,6 @@ const sending = ref(false)
 const error = ref('')
 const loadError = ref('')
 
-const root = ref<HTMLElement | null>(null)
-const trigger = ref<HTMLButtonElement | null>(null)
-const input = ref<HTMLTextAreaElement | null>(null)
-
 const shownCount = computed(() => sentCount.value ?? props.count)
 const triggerLabel = computed(() => shownCount.value > 0 ? `Feedback, ${shownCount.value} recent ${shownCount.value === 1 ? 'note' : 'notes'}` : 'Feedback')
 
@@ -82,55 +74,43 @@ watch(() => props.findingId, () => {
   loadError.value = ''
 })
 
-function day(sentAt: string): string {
-  const d = new Date(sentAt)
-  return Number.isNaN(d.getTime()) ? sentAt.slice(0, 10) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+// sentAt is written in the tenant's zone: its day is the tenant's, as the acknowledgement line reads it, not the browser's.
 function meta(item: AuditFeedbackNote): string {
-  return [item.by.label || item.by.id, item.record, day(item.sentAt)].filter(Boolean).join(' · ')
+  return [item.by.label || item.by.id, item.record, shortDate(item.sentAt.slice(0, 10))].filter(Boolean).join(' · ')
 }
 
+// An answer for a finding the person has moved on from is dropped: it is not this finding's.
 async function load(): Promise<void> {
+  const findingId = props.findingId
   loadError.value = ''
   try {
-    const response = await auditFacade.getFindingFeedback(props.findingId)
+    const response = await auditFacade.getFindingFeedback(findingId)
+    if (findingId !== props.findingId) return
     if (response.ok === false) {
       loadError.value = response.errors?.[0] || 'The notes did not load.'
       return
     }
     notes.value = [...(response.notes ?? [])].sort((a, b) => b.sentAt.localeCompare(a.sentAt))
   } catch (err) {
+    if (findingId !== props.findingId) return
     loadError.value = err instanceof Error && err.message ? err.message : 'The notes did not load.'
   }
 }
 
 function toggle(): void {
-  if (open.value) {
-    close()
-    return
-  }
-  open.value = true
-  void load()
-  void nextTick(() => input.value?.focus())
-}
-
-// Focus never falls to the page: a closed popover hands it back to its trigger, unless a press outside sent it elsewhere.
-function close(): void {
-  if (!open.value) return
-  open.value = false
-  void nextTick(() => {
-    const active = document.activeElement
-    if (!active || active === document.body || trigger.value?.parentElement?.contains(active)) trigger.value?.focus()
-  })
+  open.value = !open.value
+  if (open.value) void load()
 }
 
 async function send(): Promise<void> {
   const text = draft.value.trim()
   if (!text || sending.value) return
+  const findingId = props.findingId
   sending.value = true
   error.value = ''
   try {
-    const response = await auditFacade.sendFindingFeedback(props.findingId, text)
+    const response = await auditFacade.sendFindingFeedback(findingId, text)
+    if (findingId !== props.findingId) return
     if (response.ok === false) {
       error.value = response.errors?.[0] || 'The note did not send. Try again.'
       return
@@ -144,6 +124,7 @@ async function send(): Promise<void> {
     sentCount.value = shownCount.value + 1
     draft.value = ''
   } catch (err) {
+    if (findingId !== props.findingId) return
     // The service's own words: a note with '<' ("HTML not allowed") or over 4,000 characters.
     error.value = err instanceof Error && err.message ? err.message : 'The note did not send. Try again.'
   } finally {
@@ -151,24 +132,9 @@ async function send(): Promise<void> {
   }
 }
 
-function onPointerDown(event: PointerEvent): void {
-  const anchor = root.value?.parentElement
-  if (open.value && anchor && event.target instanceof Node && !anchor.contains(event.target)) close()
-}
-onMounted(() => document.addEventListener('pointerdown', onPointerDown))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown))
 </script>
 
 <style scoped>
-.audit-feedback-anchor {
-  position: relative;
-  display: inline-flex;
-}
-
-.audit-feedback-trigger {
-  position: relative;
-}
-
 .audit-feedback-badge {
   position: absolute;
   top: -0.2rem;
@@ -181,23 +147,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown)
   font-size: var(--type-meta-size);
   line-height: 1rem;
   text-align: center;
-}
-
-.audit-feedback-popover {
-  position: absolute;
-  top: calc(100% + var(--space-1));
-  right: 0;
-  z-index: 6;
-  display: grid;
-  gap: var(--space-2);
-  width: min(22rem, calc(100vw - 2 * var(--space-4)));
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  text-align: left;
-  /* Scales from its trigger, above and to the right (playbook: Motion). */
-  transform-origin: right top;
 }
 
 .audit-feedback-heading,
@@ -246,24 +195,5 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown)
 
 .audit-feedback-send {
   margin-top: 0;
-}
-
-.audit-feedback-send:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.audit-feedback-pop-enter-active {
-  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
-}
-
-.audit-feedback-pop-leave-active {
-  transition: opacity var(--motion-exit) var(--ease-out), transform var(--motion-exit) var(--ease-out);
-}
-
-.audit-feedback-pop-enter-from,
-.audit-feedback-pop-leave-to {
-  opacity: 0;
-  transform: scale(var(--motion-enter-scale));
 }
 </style>

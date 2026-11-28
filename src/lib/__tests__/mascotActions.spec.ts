@@ -160,6 +160,7 @@ describe('every button in the app has an answer', () => {
     'components/audit/AuditAcknowledgePopover.vue': 'the reminder switch is named by the tenant\'s remind days ("Remind me in 5 days if still open"), a live setting',
     'pages/reconciliation/ReconciliationRuleSetManagerPage.vue': 'a read-option switch is named by the option and its system ("Open orders only, HotWax"), which is data',
     'components/audit/AuditAgentPanel.vue': 'a question\'s option buttons are named by the agent\'s own options, which are data; Send to agent is entered',
+    'components/audit/AuditPopover.vue': 'the trigger is named by its caller\'s label (AuditAcknowledgePopover, AuditFeedbackBubble), swept as a wrapper',
   }
 
   /**
@@ -335,7 +336,7 @@ describe('every button in the app has an answer', () => {
     return answered
   }
 
-  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null, StaticRecordTitle: null }
+  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null, StaticRecordTitle: null, AuditPopover: null }
   /** The prop each wrapper names its button by: the settings-page title (DAR-UI-126) names its switch by toggle-label. */
   const NAME_PROP: Readonly<Record<string, string>> = { StaticRecordTitle: 'toggle-label' }
 
