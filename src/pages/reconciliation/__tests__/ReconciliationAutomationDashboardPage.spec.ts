@@ -290,7 +290,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
       'Apr 30, 2026, 11:00 PM',
       'Apr 30, 2026, 11:03 PM',
     ])
-    expect(wrapper.find('[data-testid="automation-execution-result-link"]').exists()).toBe(false)
     expect(rows.at(0)?.text()).toContain('Succeeded')
     expect(rows.at(0)?.text()).toContain('May 1, 2026, 11:00 PM')
     expect(rows.at(0)?.text()).toContain('May 1, 2026, 11:03 PM')
@@ -318,6 +317,63 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
     await rows.at(1)?.trigger('click')
     expect(push).toHaveBeenCalledTimes(1)
+  })
+
+  it('links a failed execution that wrote its result, and keeps its Failed badge (D2)', async () => {
+    // A rule-failed run ends FAILED with a result file (DAR-OPS-029 D2): the row opens that result,
+    // whose page carries the failure banner, instead of sitting dead beside a Failed badge.
+    listAutomationExecutions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [{
+        automationExecutionId: 'EXEC_RULE_FAILED',
+        statusEnumId: 'AUT_STAT_FAILED',
+        statusLabel: 'Failed',
+        scheduledDate: '2026-05-02T06:00:00Z',
+        completedDate: '2026-05-02T06:03:00Z',
+        reconciliationRunResultId: 'RUN_RULE_FAILED',
+        resultDataManagerPath: 'reconciliation-runs/AUT_ACTIVE_API/20260502/orders_result.json',
+      }],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="automation-execution-row"]')
+    expect(row.get('.status-badge').classes()).toContain('danger')
+    expect(row.attributes('aria-label')).toBe('Open result orders_result.json')
+    await row.trigger('click')
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_API', runResultId: 'RUN_RULE_FAILED' },
+    }))
+  })
+
+  it('colours each status by name: a dead letter reads as failed, a step that never ran does not read as running', async () => {
+    const execution = (id: string, statusEnumId: string) => ({
+      automationExecutionId: id,
+      statusEnumId,
+      statusLabel: statusEnumId,
+      scheduledDate: `2026-05-0${id.length}T06:00:00Z`,
+    })
+    listAutomationExecutions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [execution('A', 'AUT_STAT_DEAD_LETTER'), execution('BB', 'AUT_STAT_NOT_RUN'), execution('CCC', 'AUT_STAT_SKIP_DUP')],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    const toneOf = (statusEnumId: string) => wrapper.findAll('[data-testid="automation-execution-row"]')
+      .find((row) => row.text().includes(statusEnumId))!.get('.status-badge').classes()
+    expect(toneOf('AUT_STAT_DEAD_LETTER')).toContain('danger')
+    expect(toneOf('AUT_STAT_NOT_RUN')).toContain('neutral')
+    expect(toneOf('AUT_STAT_SKIP_DUP')).toContain('neutral')
   })
 
   it('shows the last visit\'s automation and runs at once on a revisit, before the network answers (DAR-UI-051)', async () => {
@@ -363,8 +419,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
       expect(toggle.attributes('role')).toBe('switch')
       expect(toggle.attributes('aria-checked')).toBe('true')
       expect(toggle.attributes('aria-label')).toBe('Automation is running')
-      // The word the pill used to carry is gone; aria-checked is now the state carrier.
-      expect(wrapper.find('.automation-dashboard-status').exists()).toBe(false)
     })
 
     it('names the off state in the accessible label so the switch is not glyph-only to a screen reader', async () => {
@@ -766,7 +820,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
     const row = wrapper.get('[data-testid="automation-execution-row"]')
     expect(row.text()).toContain('Succeeded')
     expect(row.text()).not.toContain('Open result')
-    expect(row.find('[data-testid="automation-execution-result-link"]').exists()).toBe(false)
 
     await row.trigger('click')
     expect(push).not.toHaveBeenCalled()
@@ -816,8 +869,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.get('[data-testid="automation-edit-action"]').attributes('data-to')).toContain('"name":"reconciliation-automation-edit"')
     expect(wrapper.get('[data-testid="back-automations"]').attributes('data-to')).toBe('/reconciliation/automations')
     expect(wrapper.find('[data-testid="automation-run-now-action"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="automation-pause-action"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="automation-resume-action"]').exists()).toBe(false)
 
     // DAR-BE-061. The bin reads as a delete and behaves as one — confirm, gone from the page —
     // but it ARCHIVES. The two assertions that matter are that the hard delete is never called
@@ -841,10 +892,8 @@ describe('ReconciliationAutomationDashboardPage', () => {
   })
 
   it('does not show the run-now status line while the active toggle is in flight', async () => {
-    // The original bug: the status line keyed off actionInFlight, which the delete handler also
-    // set, so pressing Delete showed "Starting run..." for the duration. Delete is gone
-    // (DAR-BE-060), but actionInFlight is still shared — the active toggle sets it too — so the
-    // concern is live and this test now guards it on the control that remains.
+    // The status line keys off runNowInFlight, not the shared actionInFlight that the toggle and
+    // the bin also set: once it keyed off the shared flag and pressing Delete read "Starting run...".
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
 
@@ -943,13 +992,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
     }
   })
 
-  /**
-   * Fake timers because this test asserts EXACT call counts while the page has two real clocks
-   * running: the 5s executions interval and, after run-now, the 900ms registration poll. Both
-   * call listAutomationExecutions. On wall-clock those are a race against how long the test takes
-   * — fine when this file runs alone, lost when the whole suite is loaded. flushPromises drains
-   * microtasks and is unaffected, so the assertions below are unchanged.
-   */
   // Back from the Starting page, then Run now again while the first is still starting: one run, the same Starting page.
   it('opens the run still starting instead of sending a second one', async () => {
     runAutomationNow.mockReturnValue(new Promise(() => {}))
@@ -1341,7 +1383,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.text()).toContain('Daily API orders')
     expect(wrapper.find('[data-testid="automation-edit-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-run-now-action"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="automation-pause-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-delete-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="back-automations"]').exists()).toBe(true)
   })

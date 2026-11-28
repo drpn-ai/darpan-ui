@@ -134,7 +134,7 @@
             @row-action="openExecutionResult"
           >
             <template #cell-status="{ row }">
-              <StatusBadge :label="executionRow(row).statusLabel || executionRow(row).statusEnumId || 'Unknown'" :tone="statusTone(executionRow(row).statusEnumId)" />
+              <StatusBadge :label="executionRow(row).statusLabel || executionRow(row).statusEnumId || 'Unknown'" :tone="runStatusTone(executionRow(row).statusEnumId)" />
             </template>
 
             <template #cell-scheduled="{ row }">
@@ -241,10 +241,11 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { useListPagination } from '../../lib/listPagination'
-import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
+import { fileNameFromPath, humanizeToken, normalizeDisplayText, runStatusTone } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
-import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
+// describeTimeZone: the zone sentence for one timestamp, handed to the mascot rather than printed.
+import { describeTimeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
@@ -396,11 +397,6 @@ function formatTenantDateTime(value: unknown, fallback = '-'): string {
   return formatDateTime(value, { fallback })
 }
 
-/** The zone sentence for one timestamp, handed to the mascot rather than printed. */
-function describeTimeZone(value: unknown): string {
-  return describeZone(value)
-}
-
 function automationSystemLabel(fileSide: string, fallback: string): string {
   const savedRunOption = automation.value?.savedRun?.systemOptions?.find((option) => option.fileSide === fileSide)
   if (savedRunOption) return savedRunOption.label || savedRunOption.description || savedRunOption.enumCode || savedRunOption.enumId || fallback
@@ -550,22 +546,9 @@ function executionTime(execution: AutomationExecutionSummary): number {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-function statusTone(statusEnumId: string | undefined): 'neutral' | 'success' | 'warning' | 'danger' {
-  const normalizedStatus = normalizeDisplayText(statusEnumId).toUpperCase()
-  if (!normalizedStatus) return 'neutral'
-  if (normalizedStatus.includes('SUCCESS') || normalizedStatus.includes('DONE')) return 'success'
-  if (normalizedStatus.includes('FAIL') || normalizedStatus.includes('CANCEL')) return 'danger'
-  if (normalizedStatus.includes('RUN') || normalizedStatus.includes('PENDING') || normalizedStatus.includes('SCHED')) return 'warning'
-  return 'neutral'
-}
-
-function isSuccessfulExecution(execution: AutomationExecutionSummary): boolean {
-  const status = execution.statusEnumId?.toUpperCase() || ''
-  return status.includes('SUCCESS') || status.includes('DONE')
-}
-
+// Any finished execution that wrote a result opens it. DAR-OPS-029 D2: a rule-failed run ends FAILED with its result
+// file, and its result page says it failed; gating on SUCCESS left that row dead beside its Failed badge.
 function executionResultPath(execution: AutomationExecutionSummary): string {
-  if (!isSuccessfulExecution(execution)) return ''
   return normalizeDisplayText(execution.resultDataManagerPath) || normalizeDisplayText(execution.resultFileName)
 }
 
@@ -630,17 +613,20 @@ const RUN_REGISTRATION_POLL_ATTEMPTS = 12
 // started -- accepting it sends the user to watch someone else's run believing it is theirs.
 const RUN_REGISTRATION_CLOCK_SKEW_MS = 5000
 
+// Ends early on abort; the listener goes when the wait does, so twelve waits leave none behind on the signal.
 function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal.aborted) {
       resolve()
       return
     }
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener('abort', () => {
+    const finish = () => {
       clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
       resolve()
-    }, { once: true })
+    }
+    const timer = setTimeout(finish, ms)
+    signal.addEventListener('abort', finish, { once: true })
   })
 }
 
