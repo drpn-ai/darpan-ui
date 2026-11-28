@@ -16,7 +16,8 @@ const ACK: AuditAcknowledgement = {
 }
 
 function mountPopover(props: Partial<{ initial: AuditAcknowledgement | null; remindDays: number; open: boolean }> = {}) {
-  return mount(AuditAcknowledgePopover, { props: { initial: null, remindDays: 5, open: true, ...props } })
+  const testId = props.initial ? 'audit-ack-edit' : 'audit-acknowledge'
+  return mount(AuditAcknowledgePopover, { props: { initial: null, remindDays: 5, open: true, testId, ...props } })
 }
 
 describe('AuditAcknowledgePopover', () => {

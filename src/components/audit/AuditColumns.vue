@@ -310,7 +310,7 @@
                     <!-- DAR-UI-144. Feedback to Darpan on this statement and cause: recent notes and a box to send one. -->
                     <AuditFeedbackBubble :finding-id="ackTarget" :record-label="feedbackRecord" :count="findingDoc.finding.feedback?.recentCount ?? 0" />
                     <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
-                    <AuditAcknowledgePopover v-if="canAcknowledge" ref="ackNew" :initial="null" :remind-days="remindDays" :open="ackEditing === 'new'" @toggle="toggleAck('new')" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="ackEditing = null" />
+                    <AuditAcknowledgePopover v-if="canAcknowledge" ref="ackNew" test-id="audit-acknowledge" :initial="null" :remind-days="remindDays" :open="ackEditing === 'new'" @toggle="toggleAck('new')" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="ackEditing = null" />
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
                     <button v-if="canResolve && findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
                       <AppIcon name="resolve" />
@@ -326,7 +326,7 @@
                   <div class="audit-detail-head">
                     <span class="audit-row-sub">{{ ackCardLine }}</span>
                     <span class="audit-col-head-end">
-                      <AuditAcknowledgePopover ref="ackEdit" :initial="acknowledgement" :remind-days="remindDays" :open="ackEditing === 'edit'" @toggle="toggleAck('edit')" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="ackEditing = null" />
+                      <AuditAcknowledgePopover ref="ackEdit" test-id="audit-ack-edit" :initial="acknowledgement" :remind-days="remindDays" :open="ackEditing === 'edit'" @toggle="toggleAck('edit')" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="ackEditing = null" />
                       <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" @click="reopenAck">Reopen</button>
                     </span>
                   </div>

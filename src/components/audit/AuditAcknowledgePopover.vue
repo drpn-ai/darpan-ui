@@ -7,7 +7,7 @@
     :open="open"
     :label="initial ? 'Edit acknowledgement' : 'Acknowledge'"
     :icon="initial ? 'edit' : 'acknowledge'"
-    :test-id="initial ? 'audit-ack-edit' : 'audit-acknowledge'"
+    :test-id="testId"
     dialog-label="Acknowledgement"
     dialog-test-id="audit-ack-popover"
     @toggle="emit('toggle')"
@@ -47,6 +47,9 @@ const props = defineProps<{
   /** The report's audit.acknowledge.remindDays. */
   remindDays: number
   open: boolean
+  /** The trigger's test id, written as a literal by the caller: the mascot reads a route's anchors only from the routed page
+   *  and the files it imports, so a seeded anchor (audit-acknowledge, audit-ack-edit) must be spelled out there. */
+  testId: string
 }>()
 
 const emit = defineEmits<{ submit: [note: string, remind: boolean]; toggle: []; close: [] }>()
