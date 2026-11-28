@@ -75,19 +75,6 @@ import type {
   SaveSyncPairResponse,
 } from './pulseTypes'
 
-// Cache-reset coordinator. The actual reset implementation is wired up in
-// main.ts after Pinia is installed, so this module stays free of store
-// imports (avoiding circular dependencies with referenceData store, which
-// itself depends on settingsFacade defined below).
-let _resetApiCache: (() => void) | null = null
-
-export function setApiCacheReset(fn: () => void): void {
-  _resetApiCache = fn
-}
-
-export function clearApiResponseCache(): void {
-  _resetApiCache?.()
-}
 import type {
   CreateRuleSetRunResponse,
   ChangeExpiredPasswordResponse,
@@ -98,7 +85,6 @@ import type {
   VerifyPasswordResetCodeResponse,
   ChangeOwnPasswordResponse,
   DeleteJsonSchemaResponse,
-  DeleteAutomationResponse,
   DeleteNsAuthConfigResponse,
   DeleteOmsRestSourceConfigResponse,
   DeleteSavedRunResponse,
@@ -196,7 +182,6 @@ import type {
   RenamePasskeyResponse,
   DeletePasskeyResponse,
   StoreSourceConfigEndpointAccessResponse,
-  ValidateJsonResponse,
 } from './types'
 import type {
   ChangeExpiredPasswordPayload,
@@ -222,7 +207,6 @@ import type {
   DeletePasskeyPayload,
   RevokeCliSessionPayload,
   CreateRuleSetRunPayload,
-  DeleteAutomationPayload,
   DeleteJsonSchemaPayload,
   DeleteNsAuthConfigPayload,
   DeleteOmsRestSourceConfigPayload,
@@ -282,7 +266,6 @@ import type {
   UnsubscribeRunNotificationPayload,
   CancelReconciliationRunPayload,
   GetAppContentResponse,
-  ValidateJsonTextPayload,
   VerifyOwnPasswordPayload,
 } from './facadeTypes'
 import type {
@@ -309,6 +292,25 @@ import type {
   SaveFlowchartRunPayload,
   SaveFlowchartRunResponse,
 } from './flowchartTypes'
+import type { Schemas } from './generated'
+
+type ParamsName = { [K in keyof Schemas]: K extends `${infer Name}Params` ? Name : never }[keyof Schemas]
+/** The contract's params for one call (`Params<'GetAuditReport'>`): the backend's own declaration, so a payload cannot drift. */
+type Params<Name extends ParamsName> = Schemas[`${Name}Params` & keyof Schemas]
+
+// Cache-reset coordinator. The actual reset implementation is wired up in
+// main.ts after Pinia is installed, so this module stays free of store
+// imports (avoiding circular dependencies with referenceData store, which
+// itself depends on settingsFacade defined below).
+let _resetApiCache: (() => void) | null = null
+
+export function setApiCacheReset(fn: () => void): void {
+  _resetApiCache = fn
+}
+
+export function clearApiResponseCache(): void {
+  _resetApiCache?.()
+}
 
 // A refused sign-in or setup step is answered as a completed call whose fields (challengeEnded, reason) decide the next
 // screen.
@@ -396,7 +398,6 @@ const JSON_SCHEMA = {
   saveText: 'facade.JsonSchemaFacadeServices.save#JsonSchemaText',
   inferFromText: 'facade.JsonSchemaFacadeServices.infer#JsonSchemaFromText',
   inferFromCsvText: 'facade.JsonSchemaFacadeServices.infer#JsonSchemaFromCsvText',
-  validateText: 'facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema',
   flatten: 'facade.JsonSchemaFacadeServices.flatten#JsonSchema',
   saveRefined: 'facade.JsonSchemaFacadeServices.save#RefinedSchema',
   delete: 'facade.JsonSchemaFacadeServices.delete#JsonSchema',
@@ -445,16 +446,12 @@ const RECONCILIATION = {
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
   syncAutomation: 'facade.ReconciliationFacadeServices.sync#Automation',
-  deleteAutomation: 'facade.ReconciliationFacadeServices.delete#Automation',
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
   pauseAutomation: 'facade.ReconciliationFacadeServices.pause#Automation',
   resumeAutomation: 'facade.ReconciliationFacadeServices.resume#Automation',
   // DAR-BE-061. The trash can, which archives rather than deletes. Distinct from pause: pausing
   // keeps an automation on the list, archiving takes it off.
   archiveAutomation: 'facade.ReconciliationFacadeServices.archive#Automation',
-  restoreAutomation: 'facade.ReconciliationFacadeServices.restore#Automation',
-  archiveSavedRun: 'facade.ReconciliationFacadeServices.archive#SavedRun',
-  restoreSavedRun: 'facade.ReconciliationFacadeServices.restore#SavedRun',
   listAutomationExecutions: 'facade.ReconciliationFacadeServices.list#AutomationExecutions',
   listAutomationSourceOptions: 'facade.ReconciliationFacadeServices.list#AutomationSourceOptions',
   subscribeRunNotification: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -705,9 +702,6 @@ export const jsonSchemaFacade = {
   inferFromCsvText(payload: InferJsonSchemaFromCsvTextPayload, signal?: AbortSignal): Promise<InferJsonSchemaResponse> {
     return callService<InferJsonSchemaResponse>(JSON_SCHEMA.inferFromCsvText, payload, signal)
   },
-  validateText(payload: ValidateJsonTextPayload, signal?: AbortSignal): Promise<ValidateJsonResponse> {
-    return callService<ValidateJsonResponse>(JSON_SCHEMA.validateText, payload, signal)
-  },
   flatten(payload: FlattenJsonSchemaPayload, signal?: AbortSignal): Promise<FlattenJsonSchemaResponse> {
     return callService<FlattenJsonSchemaResponse>(JSON_SCHEMA.flatten, payload, signal)
   },
@@ -747,10 +741,10 @@ export const auditFacade = {
   getAudits(signal?: AbortSignal): Promise<GetAuditsResponse> {
     return callService<GetAuditsResponse>(AUDIT.getAudits, {}, signal)
   },
-  getAuditReport(payload: { audit: string; date?: string; period?: string }, signal?: AbortSignal): Promise<GetAuditReportResponse> {
+  getAuditReport(payload: Params<'GetAuditReport'>, signal?: AbortSignal): Promise<GetAuditReportResponse> {
     return callService<GetAuditReportResponse>(AUDIT.getAuditReport, payload, signal)
   },
-  getAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
+  getAuditFinding(payload: Params<'GetAuditFinding'>, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
   },
   getAuditFindingsByOrder(
@@ -775,20 +769,17 @@ export const auditFacade = {
   getFindingFeedback(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; notes: AuditFeedbackNote[]; shownDays: number }> {
     return callService(AUDIT.getFindingFeedback, { findingId }, signal)
   },
-  getAuditCheckExtracts(
-    payload: { audit: string; check: string; date: string; period: string },
-    signal?: AbortSignal,
-  ): Promise<GetAuditCheckExtractsResponse> {
+  getAuditCheckExtracts(payload: Params<'GetAuditCheckExtracts'>, signal?: AbortSignal): Promise<GetAuditCheckExtractsResponse> {
     return callService<GetAuditCheckExtractsResponse>(AUDIT.getAuditCheckExtracts, payload, signal)
   },
   // DAR-UI-063. The settings gear and play button. save# and run# are writes, so callService drops the read cache.
-  getAuditSettings(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditSettingsResponse> {
+  getAuditSettings(payload: Params<'GetAuditSettings'>, signal?: AbortSignal): Promise<GetAuditSettingsResponse> {
     return callService<GetAuditSettingsResponse>(AUDIT.getAuditSettings, payload, signal)
   },
-  getAuditProgress(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditProgressResponse> {
+  getAuditProgress(payload: Params<'GetAuditProgress'>, signal?: AbortSignal): Promise<GetAuditProgressResponse> {
     return callService<GetAuditProgressResponse>(AUDIT.getAuditProgress, payload, signal)
   },
-  retryAuditCheck(payload: { audit: string; check: string; date?: string; period: string }, signal?: AbortSignal): Promise<RetryAuditCheckResponse> {
+  retryAuditCheck(payload: Params<'RetryAuditCheck'>, signal?: AbortSignal): Promise<RetryAuditCheckResponse> {
     return callService<RetryAuditCheckResponse>(AUDIT.retryAuditCheck, payload, signal)
   },
   saveAuditSettings(payload: SaveAuditSettingsPayload, signal?: AbortSignal): Promise<SaveAuditSettingsResponse> {
@@ -804,13 +795,13 @@ export const auditFacade = {
   runAudit(payload: RunAuditPayload, signal?: AbortSignal): Promise<RunAuditResponse> {
     return callService<RunAuditResponse>(AUDIT.runAudit, payload, signal)
   },
-  verifyAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<VerifyAuditFindingResponse> {
+  verifyAuditFinding(payload: Params<'VerifyAuditFinding'>, signal?: AbortSignal): Promise<VerifyAuditFindingResponse> {
     return callService<VerifyAuditFindingResponse>(AUDIT.verifyAuditFinding, payload, signal)
   },
-  verifyAuditFindings(payload: { audit: string; period: string; statement?: string }, signal?: AbortSignal): Promise<VerifyAuditFindingsResponse> {
+  verifyAuditFindings(payload: Params<'VerifyAuditFindings'>, signal?: AbortSignal): Promise<VerifyAuditFindingsResponse> {
     return callService<VerifyAuditFindingsResponse>(AUDIT.verifyAuditFindings, payload, signal)
   },
-  getAuditRecheckProgress(payload: { audit: string; period: string; statement?: string; since: string }, signal?: AbortSignal): Promise<GetAuditRecheckProgressResponse> {
+  getAuditRecheckProgress(payload: Params<'GetAuditRecheckProgress'>, signal?: AbortSignal): Promise<GetAuditRecheckProgressResponse> {
     return callService<GetAuditRecheckProgressResponse>(AUDIT.getAuditRecheckProgress, payload, signal)
   },
 }
@@ -824,16 +815,16 @@ const CONFIG = {
 } as const
 
 export const configFacade = {
-  snapshotTenantConfig(payload: { reason?: string } = {}, signal?: AbortSignal): Promise<SnapshotTenantConfigResponse> {
+  snapshotTenantConfig(payload: Params<'SnapshotTenantConfig'> = {}, signal?: AbortSignal): Promise<SnapshotTenantConfigResponse> {
     return callService<SnapshotTenantConfigResponse>(CONFIG.snapshotTenantConfig, payload, signal)
   },
-  getTenantConfigVersions(payload: { limit?: number } = {}, signal?: AbortSignal): Promise<GetTenantConfigVersionsResponse> {
+  getTenantConfigVersions(payload: Params<'GetTenantConfigVersions'> = {}, signal?: AbortSignal): Promise<GetTenantConfigVersionsResponse> {
     return callService<GetTenantConfigVersionsResponse>(CONFIG.getTenantConfigVersions, payload, signal)
   },
-  previewTenantConfigRestore(payload: { id: string }, signal?: AbortSignal): Promise<PreviewTenantConfigRestoreResponse> {
+  previewTenantConfigRestore(payload: Params<'PreviewTenantConfigRestore'>, signal?: AbortSignal): Promise<PreviewTenantConfigRestoreResponse> {
     return callService<PreviewTenantConfigRestoreResponse>(CONFIG.previewTenantConfigRestore, payload, signal)
   },
-  restoreTenantConfigVersion(payload: { id: string; planHash: string }, signal?: AbortSignal): Promise<RestoreTenantConfigVersionResponse> {
+  restoreTenantConfigVersion(payload: Params<'RestoreTenantConfigVersion'>, signal?: AbortSignal): Promise<RestoreTenantConfigVersionResponse> {
     return callService<RestoreTenantConfigVersionResponse>(CONFIG.restoreTenantConfigVersion, payload, signal)
   },
 }
@@ -846,7 +837,6 @@ const SCRIPT = {
   runTenantQuery: 'facade.TenantScriptFacadeServices.run#TenantQuery',
   listTenantQuerySchedules: 'facade.TenantScriptFacadeServices.list#TenantQuerySchedules',
   saveTenantQuerySchedule: 'facade.TenantScriptFacadeServices.save#TenantQuerySchedule',
-  deleteTenantQuerySchedule: 'facade.TenantScriptFacadeServices.delete#TenantQuerySchedule',
   runTenantQuerySchedule: 'facade.TenantScriptFacadeServices.run#TenantQuerySchedule',
   sendAgentQueryTurn: 'facade.AgentTurnFacadeServices.send#AgentQueryTurn',
   getTenantQueryCatalog: 'facade.TenantScriptFacadeServices.get#TenantQueryCatalog',
@@ -860,28 +850,25 @@ export const scriptFacade = {
   saveTenantQuery(payload: SaveTenantQueryPayload, signal?: AbortSignal): Promise<SaveTenantQueryResponse> {
     return callService<SaveTenantQueryResponse>(SCRIPT.saveTenantQuery, payload, signal)
   },
-  deleteTenantQuery(payload: { tenantQueryId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+  deleteTenantQuery(payload: Params<'DeleteTenantQuery'>, signal?: AbortSignal): Promise<Record<string, unknown>> {
     return callService<Record<string, unknown>>(SCRIPT.deleteTenantQuery, payload, signal)
   },
   /** A saved query, or the read and script given, on the tenant's data now; nothing is sent. */
   runTenantQuery(payload: RunTenantQueryPayload, signal?: AbortSignal): Promise<RunTenantQueryResponse> {
     return callService<RunTenantQueryResponse>(SCRIPT.runTenantQuery, payload, signal)
   },
-  listTenantQuerySchedules(payload: { tenantQueryId?: string } = {}, signal?: AbortSignal): Promise<ListTenantQuerySchedulesResponse> {
+  listTenantQuerySchedules(payload: Params<'ListTenantQuerySchedules'> = {}, signal?: AbortSignal): Promise<ListTenantQuerySchedulesResponse> {
     return callService<ListTenantQuerySchedulesResponse>(SCRIPT.listTenantQuerySchedules, payload, signal)
   },
   saveTenantQuerySchedule(payload: SaveTenantQuerySchedulePayload, signal?: AbortSignal): Promise<SaveTenantQueryScheduleResponse> {
     return callService<SaveTenantQueryScheduleResponse>(SCRIPT.saveTenantQuerySchedule, payload, signal)
   },
-  deleteTenantQuerySchedule(payload: { scheduleId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
-    return callService<Record<string, unknown>>(SCRIPT.deleteTenantQuerySchedule, payload, signal)
-  },
   /** send=false (default) previews; send=true delivers it now (its owner only) and records the run. */
-  runTenantQuerySchedule(payload: { scheduleId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantQueryScheduleResponse> {
+  runTenantQuerySchedule(payload: Params<'RunTenantQuerySchedule'>, signal?: AbortSignal): Promise<RunTenantQueryScheduleResponse> {
     return callService<RunTenantQueryScheduleResponse>(SCRIPT.runTenantQuerySchedule, payload, signal)
   },
   /** The queries page's agent: one message; it proposes a query that has already run (queryProposal), never saves. */
-  sendAgentQueryTurn(payload: { conversationId?: string; text: string; readSpecJson?: string; scriptBody?: string }, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
+  sendAgentQueryTurn(payload: Params<'SendAgentQueryTurn'>, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
     return callService<SendAgentQueryTurnResponse>(SCRIPT.sendAgentQueryTurn, payload, signal)
   },
   /** DAR-UI-138. What a query may read, by name: the tenant's kept datasets, saved runs and audits, with their fields. */
@@ -889,7 +876,7 @@ export const scriptFacade = {
     return callService<GetTenantQueryCatalogResponse>(SCRIPT.getTenantQueryCatalog, {}, signal)
   },
   /** DAR-UI-138. The signed-in user's pinned queries for the active tenant, in order; unknown ids are dropped. */
-  saveTenantQueryPins(payload: { pinnedQueryIds: string[] }, signal?: AbortSignal): Promise<SaveTenantQueryPinsResponse> {
+  saveTenantQueryPins(payload: Params<'SaveTenantQueryPins'>, signal?: AbortSignal): Promise<SaveTenantQueryPinsResponse> {
     return callService<SaveTenantQueryPinsResponse>(SCRIPT.saveTenantQueryPins, payload, signal)
   },
 }
@@ -910,25 +897,25 @@ export const peakFacade = {
   listPeakPeriods(signal?: AbortSignal): Promise<ListPeakPeriodsResponse> {
     return callService<ListPeakPeriodsResponse>(PEAK.listPeakPeriods, {}, signal)
   },
-  getPeakPeriod(payload: { peakPeriodId: string }, signal?: AbortSignal): Promise<GetPeakPeriodResponse> {
+  getPeakPeriod(payload: Params<'GetPeakPeriod'>, signal?: AbortSignal): Promise<GetPeakPeriodResponse> {
     return callService<GetPeakPeriodResponse>(PEAK.getPeakPeriod, payload, signal)
   },
   savePeakPeriod(payload: SavePeakPeriodPayload, signal?: AbortSignal): Promise<SavePeakPeriodResponse> {
     return callService<SavePeakPeriodResponse>(PEAK.savePeakPeriod, payload, signal)
   },
-  deletePeakPeriod(payload: { peakPeriodId: string }, signal?: AbortSignal): Promise<DeletePeakPeriodResponse> {
+  deletePeakPeriod(payload: Params<'DeletePeakPeriod'>, signal?: AbortSignal): Promise<DeletePeakPeriodResponse> {
     return callService<DeletePeakPeriodResponse>(PEAK.deletePeakPeriod, payload, signal)
   },
   savePeakRunTime(payload: SavePeakRunTimePayload, signal?: AbortSignal): Promise<SavePeakRunTimeResponse> {
     return callService<SavePeakRunTimeResponse>(PEAK.savePeakRunTime, payload, signal)
   },
-  deletePeakRunTime(payload: { runTimeId: string }, signal?: AbortSignal): Promise<DeletePeakRunTimeResponse> {
+  deletePeakRunTime(payload: Params<'DeletePeakPeriodRunTime'>, signal?: AbortSignal): Promise<DeletePeakRunTimeResponse> {
     return callService<DeletePeakRunTimeResponse>(PEAK.deletePeakRunTime, payload, signal)
   },
   savePeakSync(payload: SavePeakSyncPayload, signal?: AbortSignal): Promise<SavePeakSyncResponse> {
     return callService<SavePeakSyncResponse>(PEAK.savePeakSync, payload, signal)
   },
-  deletePeakSync(payload: { peakPeriodId: string; syncPairId: string }, signal?: AbortSignal): Promise<DeletePeakSyncResponse> {
+  deletePeakSync(payload: Params<'DeletePeakPeriodSync'>, signal?: AbortSignal): Promise<DeletePeakSyncResponse> {
     return callService<DeletePeakSyncResponse>(PEAK.deletePeakSync, payload, signal)
   },
 }
@@ -947,16 +934,16 @@ export const pulseFacade = {
     return callService<ListSyncPairsResponse>(PULSE.listSyncPairs, {}, signal)
   },
   /** Without a syncPairId, only the pickers (automations, chatSpaces) for a new pair. */
-  getSyncPair(payload: { syncPairId?: string }, signal?: AbortSignal): Promise<GetSyncPairResponse> {
+  getSyncPair(payload: Params<'GetSyncPair'>, signal?: AbortSignal): Promise<GetSyncPairResponse> {
     return callService<GetSyncPairResponse>(PULSE.getSyncPair, payload, signal)
   },
   saveSyncPair(payload: SaveSyncPairPayload, signal?: AbortSignal): Promise<SaveSyncPairResponse> {
     return callService<SaveSyncPairResponse>(PULSE.saveSyncPair, payload, signal)
   },
-  deleteSyncPair(payload: { syncPairId: string }, signal?: AbortSignal): Promise<DeleteSyncPairResponse> {
+  deleteSyncPair(payload: Params<'DeleteSyncPair'>, signal?: AbortSignal): Promise<DeleteSyncPairResponse> {
     return callService<DeleteSyncPairResponse>(PULSE.deleteSyncPair, payload, signal)
   },
-  getRunPulseFlags(payload: { reconciliationRunResultId: string }, signal?: AbortSignal): Promise<GetRunPulseFlagsResponse> {
+  getRunPulseFlags(payload: Params<'GetRunPulseFlags'>, signal?: AbortSignal): Promise<GetRunPulseFlagsResponse> {
     return callService<GetRunPulseFlagsResponse>(PULSE.getRunPulseFlags, payload, signal)
   },
 }
@@ -990,25 +977,25 @@ export const agentFacade = {
     return callService<GetAgentStatusResponse>(AGENT.getAgentStatus, payload, signal)
   },
   /** The person's own conversation, to reload the panel; another person's reads as not found. */
-  getAgentConversation(payload: { conversationId: string }, signal?: AbortSignal): Promise<GetAgentConversationResponse> {
+  getAgentConversation(payload: Params<'GetAgentConversation'>, signal?: AbortSignal): Promise<GetAgentConversationResponse> {
     return callService<GetAgentConversationResponse>(AGENT.getAgentConversation, payload, signal)
   },
   /** One message. Answers within the request (up to 4 minutes); a write, so it is never retried. */
   sendAgentTurn(payload: SendAgentTurnPayload, signal?: AbortSignal): Promise<SendAgentTurnResponse> {
     return callService<SendAgentTurnResponse>(AGENT.sendAgentTurn, payload, signal)
   },
-  planAuditChange(payload: { proposalId: string }, signal?: AbortSignal): Promise<PlanAuditChangeResponse> {
+  planAuditChange(payload: Params<'PlanAuditChange'>, signal?: AbortSignal): Promise<PlanAuditChangeResponse> {
     return callService<PlanAuditChangeResponse>(AGENT.planAuditChange, payload, signal)
   },
   /** Applies exactly the plan the person saw (planHash); a config version is kept before and after. */
-  applyAuditChange(payload: { proposalId: string; planHash: string }, signal?: AbortSignal): Promise<ApplyAuditChangeResponse> {
+  applyAuditChange(payload: Params<'ApplyAuditChange'>, signal?: AbortSignal): Promise<ApplyAuditChangeResponse> {
     return callService<ApplyAuditChangeResponse>(AGENT.applyAuditChange, payload, signal)
   },
-  rejectAuditChange(payload: { proposalId: string; reason?: string }, signal?: AbortSignal): Promise<RejectAuditChangeResponse> {
+  rejectAuditChange(payload: Params<'RejectAuditChange'>, signal?: AbortSignal): Promise<RejectAuditChangeResponse> {
     return callService<RejectAuditChangeResponse>(AGENT.rejectAuditChange, payload, signal)
   },
   /** Drafts the undo of an applied change as a new, planned proposal; it applies only when approved. */
-  revertAuditChange(payload: { proposalId: string }, signal?: AbortSignal): Promise<RevertAuditChangeResponse> {
+  revertAuditChange(payload: Params<'RevertAuditChange'>, signal?: AbortSignal): Promise<RevertAuditChangeResponse> {
     return callService<RevertAuditChangeResponse>(AGENT.revertAuditChange, payload, signal)
   },
 }
@@ -1062,28 +1049,28 @@ export const reconciliationFacade = {
   saveReconciliation(payload: SaveFlowchartRunPayload, signal?: AbortSignal): Promise<SaveFlowchartRunResponse> {
     return callService<SaveFlowchartRunResponse>(RECONCILIATION.saveReconciliation, payload, signal)
   },
-  getReconciliation(payload: { reconciliationId: string }, signal?: AbortSignal): Promise<GetFlowchartRunResponse> {
+  getReconciliation(payload: Params<'GetReconciliation'>, signal?: AbortSignal): Promise<GetFlowchartRunResponse> {
     return callService<GetFlowchartRunResponse>(RECONCILIATION.getReconciliation, payload, signal)
   },
   saveReconciliationQuestion(payload: SaveFlowchartQuestionPayload, signal?: AbortSignal): Promise<SaveFlowchartQuestionResponse> {
     return callService<SaveFlowchartQuestionResponse>(RECONCILIATION.saveReconciliationQuestion, payload, signal)
   },
-  deleteReconciliationQuestion(payload: { reconciliationRunId: string }, signal?: AbortSignal): Promise<{ ok?: boolean }> {
+  deleteReconciliationQuestion(payload: Params<'DeleteReconciliationQuestion'>, signal?: AbortSignal): Promise<{ ok?: boolean }> {
     return callService<{ ok?: boolean }>(RECONCILIATION.deleteReconciliationQuestion, payload, signal)
   },
   runReconciliation(payload: RunFlowchartPayload, signal?: AbortSignal): Promise<RunFlowchartResponse> {
     return callService<RunFlowchartResponse>(RECONCILIATION.runReconciliation, payload, signal)
   },
-  getReconciliationExecution(payload: { reconciliationExecutionId: string }, signal?: AbortSignal): Promise<GetFlowchartExecutionResponse> {
+  getReconciliationExecution(payload: Params<'GetReconciliationExecution'>, signal?: AbortSignal): Promise<GetFlowchartExecutionResponse> {
     return callService<GetFlowchartExecutionResponse>(RECONCILIATION.getReconciliationExecution, payload, signal)
   },
-  listReconciliationExecutions(payload: { reconciliationId: string }, signal?: AbortSignal): Promise<ListFlowchartExecutionsResponse> {
+  listReconciliationExecutions(payload: Params<'ListReconciliationExecutions'>, signal?: AbortSignal): Promise<ListFlowchartExecutionsResponse> {
     return callService<ListFlowchartExecutionsResponse>(RECONCILIATION.listReconciliationExecutions, payload, signal)
   },
   importNetSuiteChecksAsRuns(signal?: AbortSignal): Promise<ImportNetSuiteChecksResponse> {
     return callService<ImportNetSuiteChecksResponse>(RECONCILIATION.importNetSuiteChecksAsRuns, {}, signal)
   },
-  getLifecycleOptions(payload: { nsAuthConfigId: string; recordType?: string }, signal?: AbortSignal): Promise<GetLifecycleOptionsResponse> {
+  getLifecycleOptions(payload: Params<'GetLifecycleOptions'>, signal?: AbortSignal): Promise<GetLifecycleOptionsResponse> {
     return callService<GetLifecycleOptionsResponse>(RECONCILIATION.getLifecycleOptions, payload, signal)
   },
   saveLifecycle(payload: SaveLifecyclePayload, signal?: AbortSignal): Promise<SaveLifecycleResponse> {
@@ -1095,13 +1082,13 @@ export const reconciliationFacade = {
   saveLifecycleRule(payload: { reconciliationId: string } & Omit<LifecycleRule, 'valueLabel'>, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
     return callService<LifecycleRulesResponse>(RECONCILIATION.saveLifecycleRule, payload, signal)
   },
-  deleteLifecycleRule(payload: { reconciliationId: string; fieldId: string; value: string }, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
+  deleteLifecycleRule(payload: Params<'DeleteLifecycleRule'>, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
     return callService<LifecycleRulesResponse>(RECONCILIATION.deleteLifecycleRule, payload, signal)
   },
   saveLifecycleFinding(payload: { reconciliationId: string } & Omit<LifecycleFinding, 'reconciliationRunId' | 'stageLabel' | 'label'>, signal?: AbortSignal): Promise<{ findings?: LifecycleFinding[] }> {
     return callService<{ findings?: LifecycleFinding[] }>(RECONCILIATION.saveLifecycleFinding, payload, signal)
   },
-  deleteLifecycleFinding(payload: { reconciliationId: string; reconciliationRunId: string }, signal?: AbortSignal): Promise<{ findings?: LifecycleFinding[] }> {
+  deleteLifecycleFinding(payload: Params<'DeleteLifecycleFinding'>, signal?: AbortSignal): Promise<{ findings?: LifecycleFinding[] }> {
     return callService<{ findings?: LifecycleFinding[] }>(RECONCILIATION.deleteLifecycleFinding, payload, signal)
   },
   saveLifecycleDetails(payload: { reconciliationId: string; details: { fieldId: string; label: string }[] }, signal?: AbortSignal): Promise<{ details?: LifecycleDetail[] }> {
@@ -1110,14 +1097,14 @@ export const reconciliationFacade = {
   saveLifecycleStageException(payload: { reconciliationId: string } & Omit<LifecycleStageException, 'stageLabel'>, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
     return callService<LifecycleStageExceptionsResponse>(RECONCILIATION.saveLifecycleStageException, payload, signal)
   },
-  saveLifecycleStages(payload: { reconciliationId: string; stageRecordTypes: string[] }, signal?: AbortSignal): Promise<{ reconciliationName?: string }> {
+  saveLifecycleStages(payload: Params<'SaveLifecycleStages'>, signal?: AbortSignal): Promise<{ reconciliationName?: string }> {
     return callService<{ reconciliationName?: string }>(RECONCILIATION.saveLifecycleStages, payload, signal)
   },
   /** DAR-UI-050. The questions these stages in this order would make, named as a save names them; nothing is saved. */
-  getLifecyclePlan(payload: { recordType: string; stageRecordTypes: string[] }, signal?: AbortSignal): Promise<{ questions?: FlowchartQuestion[] }> {
+  getLifecyclePlan(payload: Params<'GetLifecyclePlan'>, signal?: AbortSignal): Promise<{ questions?: FlowchartQuestion[] }> {
     return callService<{ questions?: FlowchartQuestion[] }>(RECONCILIATION.getLifecyclePlan, payload, signal)
   },
-  deleteLifecycleStageException(payload: { reconciliationId: string; stageRecordType: string; fieldId?: string; value: string }, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
+  deleteLifecycleStageException(payload: Params<'DeleteLifecycleStageException'>, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
     return callService<LifecycleStageExceptionsResponse>(RECONCILIATION.deleteLifecycleStageException, payload, signal)
   },
   getGeneratedOutputDifferences(
@@ -1138,23 +1125,11 @@ export const reconciliationFacade = {
   syncAutomation(payload: SyncAutomationPayload, signal?: AbortSignal): Promise<SyncAutomationResponse> {
     return callService<SyncAutomationResponse>(RECONCILIATION.syncAutomation, payload, signal)
   },
-  deleteAutomation(payload: DeleteAutomationPayload, signal?: AbortSignal): Promise<DeleteAutomationResponse> {
-    return callService<DeleteAutomationResponse>(RECONCILIATION.deleteAutomation, payload, signal)
-  },
   runAutomationNow(payload: RunAutomationNowPayload, signal?: AbortSignal): Promise<RunAutomationNowResponse> {
     return callService<RunAutomationNowResponse>(RECONCILIATION.runAutomationNow, payload, signal)
   },
-  archiveAutomation(payload: { automationId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
+  archiveAutomation(payload: Params<'ArchiveAutomation'>, signal?: AbortSignal): Promise<ArchiveResponse> {
     return callService<ArchiveResponse>(RECONCILIATION.archiveAutomation, payload, signal)
-  },
-  restoreAutomation(payload: { automationId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
-    return callService<ArchiveResponse>(RECONCILIATION.restoreAutomation, payload, signal)
-  },
-  archiveSavedRun(payload: { savedRunId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
-    return callService<ArchiveResponse>(RECONCILIATION.archiveSavedRun, payload, signal)
-  },
-  restoreSavedRun(payload: { savedRunId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
-    return callService<ArchiveResponse>(RECONCILIATION.restoreSavedRun, payload, signal)
   },
   pauseAutomation(payload: PauseAutomationPayload, signal?: AbortSignal): Promise<PauseAutomationResponse> {
     return callService<PauseAutomationResponse>(RECONCILIATION.pauseAutomation, payload, signal)
