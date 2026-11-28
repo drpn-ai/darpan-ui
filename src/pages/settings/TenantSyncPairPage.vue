@@ -29,7 +29,7 @@
           </template>
           <div v-if="samples.length" class="sync-pair-charts">
             <PulseOldestChart v-model:active="activeHour" :samples="samples" :allowance-minutes="shownAllowance" />
-            <PulseWaitingChart v-model:active="activeHour" :samples="samples" :allowance-minutes="shownAllowance" />
+            <PulseWaitingChart v-model:active="activeHour" :samples="samples" />
           </div>
           <p v-else class="section-note" data-testid="sync-pair-today-empty">No pulses today.</p>
         </StaticPageSection>
@@ -317,7 +317,7 @@ import {
 } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { formatClockTime } from '../../lib/utils/date'
-import { loadSyncPulseView, pairSidesLabel } from '../../lib/syncPulseView'
+import { calendarDayWords, latestReadSample, loadSyncPulseView, pairSidesLabel } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -403,19 +403,13 @@ const allowanceDraftIsNormal = computed(() => draft.value?.allowanceMinutes === 
 const everyDraftIsNormal = computed(() => (draft.value?.pulseEveryMinutes || null) === (normalPulseEvery.value || null))
 const shownAllowance = computed(() => (allowancePeriodActive.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
 const periodThru = computed(() => saved.value?.periodThruDate ?? '')
-/** A yyyy-MM-dd calendar day as "1 Dec", the same in every zone (it is a date, not an instant). */
-function calendarDay(isoDate: string): string {
-  const [year, month, day] = isoDate.slice(0, 10).split('-').map(Number)
-  if (!year || !month || !day) return ''
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)))
-}
 /** What the period does to the pulse, as a verb phrase: "pulses every hour", "turns the pulse off". */
 function periodPulseWords(minutes: number | null | undefined): string {
   if (!minutes) return 'turns the pulse off'
   if (minutes === 60) return 'pulses every hour'
   return minutes % 60 === 0 ? `pulses every ${minutes / 60} hours` : `pulses every ${minutes} min`
 }
-const periodUntil = computed(() => (periodThru.value ? ` through ${calendarDay(periodThru.value)}` : ''))
+const periodUntil = computed(() => (periodThru.value ? ` through ${calendarDayWords(periodThru.value)}` : ''))
 /** The popup's one-line cue that a peak period overrides the value it edits. */
 const allowanceNote = computed(() => (allowancePeriodActive.value
   ? `Normal days. ${periodName.value} uses ${allowanceWords(saved.value?.allowanceMinutes ?? 0)}${periodUntil.value}.` : ''))
@@ -440,13 +434,7 @@ const otherSystemLabel = computed(() => chosenAutomation.value?.upstreamOptions
 const chatLabel = computed(() => chatSpaces.value.find((space) => space.chatSpaceId === draft.value?.chatSpaceId)?.label
   ?? (draft.value?.chatSpaceId ? draft.value.chatSpaceId : 'None'))
 
-/** The last pulse today that read the systems; a failed or skipped one counted nothing. */
-const latestSample = computed(() => {
-  const at = (sample: SyncSample) => new Date(sample.sampleStamp).getTime()
-  return samples.value
-    .filter((sample) => sample.statusEnumId === 'SPS_OK')
-    .reduce<SyncSample | null>((last, sample) => (!last || at(sample) >= at(last) ? sample : last), null)
-})
+const latestSample = computed(() => latestReadSample(samples.value))
 
 const oldestMinutes = computed(() => latestSample.value?.oldestWaitingMinutes ?? pastOrders.value[0]?.waitingMinutes ?? null)
 

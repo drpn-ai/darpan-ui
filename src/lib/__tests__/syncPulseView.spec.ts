@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SyncAutomationOption, SyncPairSummary } from '../api/pulseTypes'
-import { buildSyncPulseView, distinctCheckWords, labelWithCheckWords, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseAsOfWords, pulseWatchFacts, pulsingPeriods, syncPulseSettingsValue } from '../syncPulseView'
+import { buildSyncPulseView, calendarDayWords, distinctCheckWords, labelWithCheckWords, lastPulseWords, latestReadSample, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseAsOfWords, pulseWatchFacts, pulsingPeriods, syncPulseSettingsValue } from '../syncPulseView'
 
 const pair = (over: Partial<SyncPairSummary>): SyncPairSummary => ({
   syncPairId: 'SP1', label: 'HotWax → NetSuite orders', automationId: 'A1', automationName: 'Daily check', allowanceMinutes: 120,
@@ -245,5 +245,23 @@ describe('distinctCheckWords', () => {
     expect(labelWithCheckWords('Shopify → HotWax', 'Canada')).toBe('Shopify Canada → HotWax')
     expect(labelWithCheckWords('NetSuite only', 'Warranty')).toBe('NetSuite only · Warranty')
     expect(labelWithCheckWords('Shopify → HotWax', '')).toBe('Shopify → HotWax')
+  })
+})
+
+describe('calendarDayWords', () => {
+  it('reads a date or the date of a longer stamp as the same day in every zone, and nothing for anything else', () => {
+    expect(calendarDayWords('2026-12-01')).toBe('1 Dec')
+    expect(calendarDayWords('2026-12-01T23:30:00-08:00')).toBe('1 Dec')
+    expect(calendarDayWords('')).toBe('')
+    expect(calendarDayWords('not a date')).toBe('')
+  })
+})
+
+describe('latestReadSample', () => {
+  const sample = (stamp: string, status: string) => ({ sampleStamp: stamp, waitingCount: 1, oldestWaitingMinutes: 5, pastAllowanceCount: 0, statusEnumId: status })
+  it('is the newest pulse that read the systems, whatever order they come in; none when every pulse was skipped or failed', () => {
+    const late = sample('2026-11-26T12:00:00Z', 'SPS_OK')
+    expect(latestReadSample([late, sample('2026-11-26T10:00:00Z', 'SPS_OK'), sample('2026-11-26T13:00:00Z', 'SPS_FAILED')])).toBe(late)
+    expect(latestReadSample([sample('2026-11-26T13:00:00Z', 'SPS_SKIPPED')])).toBeNull()
   })
 })

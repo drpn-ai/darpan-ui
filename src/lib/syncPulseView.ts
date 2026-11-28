@@ -107,9 +107,11 @@ export function nextPulsePeriods(periods: PeakPeriodSummary[], periodRows: PeakS
   return out
 }
 
-/** "27 Nov": a calendar date, the same in every zone. */
+/** "27 Nov": a yyyy-MM-dd calendar date (a longer stamp is cut to its date), the same in every zone; '' when unreadable. */
 export function calendarDayWords(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
 /** The periods whose sync rows turn at least one pulse on: the ones worth naming on the Pulses page. */
@@ -232,6 +234,13 @@ export function lastPulseWords(stamp: string | null | undefined, statusEnumId: s
   return `last ${at}`
 }
 
+/** The last pulse today that read the systems; a skipped or failed one counted nothing. null when none did. */
+export function latestReadSample(samples: SyncSample[]): SyncSample | null {
+  const at = (s: SyncSample) => new Date(s.sampleStamp).getTime()
+  return samples.filter((s) => s.statusEnumId === 'SPS_OK')
+    .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
+}
+
 export interface PulseWatchFact {
   key: string
   label: string
@@ -248,9 +257,7 @@ export interface PulseWatchFact {
  */
 export function pulseWatchFacts(pair: SyncPair, samples: SyncSample[], pastOrders: SyncPastOrder[],
   clock: (value: string) => string, next?: NextPulse): PulseWatchFact[] {
-  const at = (s: SyncSample) => new Date(s.sampleStamp).getTime()
-  const latestRead = samples.filter((s) => s.statusEnumId === 'SPS_OK')
-    .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
+  const latestRead = latestReadSample(samples)
   const oldest = latestRead?.oldestWaitingMinutes ?? pastOrders[0]?.waitingMinutes ?? null
   const pulsesToday = Boolean(pair.pulseEveryMinutes)
   const window = pulsesToday ? pair.allowanceMinutes : next?.allowanceMinutes ?? pair.normalAllowanceMinutes ?? pair.allowanceMinutes
@@ -277,9 +284,7 @@ export function pulseWatchFacts(pair: SyncPair, samples: SyncSample[], pastOrder
  */
 export function pulseAsOfWords(pair: Pick<SyncPair, 'pulseEveryMinutes'>, samples: SyncSample[],
   clock: (value: string) => string): string {
-  const at = (s: SyncSample) => new Date(s.sampleStamp).getTime()
-  const latestRead = samples.filter((s) => s.statusEnumId === 'SPS_OK')
-    .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
+  const latestRead = latestReadSample(samples)
   const asOf = latestRead ? `as of ${clock(latestRead.sampleStamp)}` : ''
   if (pair.pulseEveryMinutes) return asOf || 'No pulse read today yet'
   return asOf ? `Last known · ${asOf}` : 'Last known figures'

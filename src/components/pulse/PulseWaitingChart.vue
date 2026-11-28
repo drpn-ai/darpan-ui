@@ -71,8 +71,6 @@ import { CHART, daySpanWords, usePulseChart, yFor } from './pulseChart'
 
 const props = withDefaults(defineProps<{
   samples: readonly SyncSample[]
-  /** Taken for symmetry with the oldest chart; a count has no allowance line. */
-  allowanceMinutes: number
   /** The hour pointed at on either chart (an index into the drawn hours); null is the latest. */
   active?: number | null
   /** The clock the hours are read on; the display zone (the tenant's, when it has one) by default. */
