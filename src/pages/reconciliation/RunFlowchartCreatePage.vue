@@ -94,7 +94,7 @@ import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type { LifecycleRecordTypeOption, LifecycleStageOption } from '../../lib/api/flowchartTypes'
-import { orderedStages, lateAfterOptions, defaultLateAfter, stageOptionLabel, stageReach } from '../../lib/lifecycleOptions'
+import { orderedStages, lateAfterOptions, defaultLateAfter, stageReach } from '../../lib/lifecycleOptions'
 
 // DAR-UI-050. A lifecycle in four dropdowns, one per step. Every option is read from the account itself
 // (get#LifecycleOptions), so nothing is typed and nothing is offered that the data does not contain. Leave-out
@@ -126,7 +126,9 @@ const recordWordOne = computed(() => {
   const label = recordTypes.value.find((r) => r.recordType === recordType.value)?.label ?? 'a record'
   return `a ${label.replace(/s$/, '').toLowerCase()}`
 })
-const stageOptions = computed(() => stages.value.map((s) => ({ value: s.recordType, label: stageOptionLabel(s) })))
+// A stage is offered by its name alone (Aditi, 2026-10-16: "just Sales Order is fine ... same for invoice and
+// fulfillments"); the data still decides which stages are offered, which are pre-chosen, and their order.
+const stageOptions = computed(() => stages.value.map((s) => ({ value: s.recordType, label: s.label })))
 const chosenInOrder = computed(() => orderedStages(stages.value, chosenStages.value))
 const lateOptions = computed(() => lateAfterOptions(chosenInOrder.value))
 const progress = computed(() => ({ account: 0, records: 25, stages: 50, late: 75 })[step.value])

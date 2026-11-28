@@ -174,6 +174,7 @@ import {
   type ReconciliationCreateFlowStepId,
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftStepId,
+  SOURCE_TYPE_API,
 } from '../../lib/reconciliationRuleSetDraft'
 import {
   canonicalDarpanSystemEnumId,
@@ -220,7 +221,6 @@ const STAGE_MAX_CARDS: Record<(typeof STAGES)[number], number> = {
 
 const FILE_TYPE_JSON = 'DftJson'
 const FILE_TYPE_CSV = 'DftCsv'
-const SOURCE_TYPE_API = 'AUT_SRC_API'
 const SOURCE_MODE_FILE = 'file'
 const SOURCE_MODE_API = 'api'
 const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']

@@ -187,6 +187,7 @@ import {
   primaryIdExpressionPayloadFields,
   reconciliationSystemTitle,
   type ReconciliationRuleSetDraft,
+  SOURCE_TYPE_API,
 } from '../../lib/reconciliationRuleSetDraft'
 import {
   darpanSystemDisplayLabel,
@@ -221,7 +222,6 @@ const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const mascot = useMascotStore()
-const SOURCE_TYPE_API = 'AUT_SRC_API'
 // A side over a saved NetSuite SuiteQL query: the config IS the query, with no endpoint behind it (as in the run builder).
 const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
 // DAR-UI-064. A one-system run reads one side and has no second one to show, validate or send.

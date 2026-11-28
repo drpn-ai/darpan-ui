@@ -6,12 +6,6 @@ function dayWord(days: number): string {
   return days === 1 ? '1 day' : `${days} days`
 }
 
-// Just the name (Aditi, 2026-10-16: "just Sales Order is fine ... same for invoice and fulfillments"). The data
-// still decides which stages are offered, which are pre-chosen, and their order.
-export function stageOptionLabel(stage: LifecycleStageOption): string {
-  return stage.label
-}
-
 /** The chosen stages in the data's order (soonest first), whatever order they were clicked in. */
 export function orderedStages(stages: LifecycleStageOption[], chosen: string[]): LifecycleStageOption[] {
   return stages.filter((s) => chosen.includes(s.recordType))

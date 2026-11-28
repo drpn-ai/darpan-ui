@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildCreateRuleSetRunPayload,
+  buildSaveRuleSetRunPayload,
   buildRuleSetRulePayloads,
   fieldSharesRecordRoot,
   type ReconciliationRuleSetDraft,
@@ -190,6 +191,14 @@ describe('single-sided runs (DAR-BE-058)', () => {
 
   it('sends scopeMode so the backend builds an EVALUATE scope', () => {
     expect(buildCreateRuleSetRunPayload(singleSided).scopeMode).toBe('EVALUATE')
+  })
+
+  // DAR-OPS-029 S99-100: save#RuleSetRun takes no scopeMode (a run's mode is fixed at create), so a save sends none.
+  it('a save sends no scopeMode, create\'s field stays create\'s', () => {
+    const payload = buildSaveRuleSetRunPayload({ ...singleSided, savedRunId: 'RS_1' }) as unknown as Record<string, unknown>
+
+    expect('scopeMode' in payload).toBe(false)
+    expect(payload.savedRunId).toBe('RS_1')
   })
 
   /**

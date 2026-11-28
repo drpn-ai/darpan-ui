@@ -6,10 +6,10 @@ import type {
 } from '../lib/api/types'
 import {
   AUTOMATION_INPUT_MODE_API_RANGE,
-  AUTOMATION_SOURCE_TYPE_API,
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
 } from '../lib/reconciliationAutomationDraft'
+import { SOURCE_TYPE_API } from '../lib/reconciliationRuleSetDraft'
 import { darpanSystemIdsMatch } from '../lib/utils/darpanSystems'
 
 export interface ApiSourceSelectOption {
@@ -184,7 +184,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     const systemOptions = deps.selectedSavedRunSystemOptions.value
     if (!systemOptions || systemOptions.length === 0) return false
     return AUTOMATION_FILE_SIDES.every(
-      (side) => systemOptionForSide(side)?.sourceTypeEnumId?.trim() === AUTOMATION_SOURCE_TYPE_API,
+      (side) => systemOptionForSide(side)?.sourceTypeEnumId?.trim() === SOURCE_TYPE_API,
     )
   })
 
@@ -203,7 +203,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
 
       const apiOption = apiSourceOptionForSavedRunSide(side)
       const inferredDraft: ReconciliationAutomationSourceDraft = {
-        sourceTypeEnumId: AUTOMATION_SOURCE_TYPE_API,
+        sourceTypeEnumId: SOURCE_TYPE_API,
         systemMessageRemoteId: apiOption?.systemMessageRemoteId ?? sideOption.systemMessageRemoteId,
         safeMetadataJson: apiOption?.safeMetadataJson,
         optionKey: sideOption.sourceConfigId,
@@ -212,7 +212,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
       nextDrafts[side] = {
         ...inferredDraft,
         ...nextDrafts[side],
-        sourceTypeEnumId: AUTOMATION_SOURCE_TYPE_API,
+        sourceTypeEnumId: SOURCE_TYPE_API,
       }
     })
 

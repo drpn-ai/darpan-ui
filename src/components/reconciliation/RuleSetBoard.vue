@@ -386,6 +386,7 @@ import {
   type ReconciliationRulePreActionEntry,
   reconciliationSystemTitle,
   RULE_NAME_MAX_LENGTH,
+  SOURCE_TYPE_API,
 } from '../../lib/reconciliationRuleSetDraft'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
@@ -456,7 +457,6 @@ const LONG_PRESS_MS = 320
 const FALLBACK_BOARD_WIDTH = 1000
 const FIELD_ROW_PITCH = 52
 const FIELD_ROW_TOP = 70
-const SOURCE_TYPE_API = 'AUT_SRC_API'
 
 const GHOST_RULE_CAPTION = 'Drag a field onto one on the right to compare them'
 

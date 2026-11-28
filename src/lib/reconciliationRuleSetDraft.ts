@@ -295,8 +295,11 @@ export function primaryIdExpressionPayloadFields(
 }
 
 export function buildSaveRuleSetRunPayload(draft: ReconciliationRuleSetDraft): SaveRuleSetRunPayload {
+  // DAR-OPS-029 S99-100: a run's mode is fixed at create; save#RuleSetRun takes no scopeMode, so it is not sent.
+  const fields = buildCreateRuleSetRunPayload(draft)
+  delete fields.scopeMode
   return {
-    ...buildCreateRuleSetRunPayload(draft),
+    ...fields,
     savedRunId: draft.savedRunId?.trim(),
     rules: buildRuleSetRulePayloads(draft),
   }

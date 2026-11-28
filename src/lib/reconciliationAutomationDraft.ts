@@ -1,10 +1,10 @@
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import type { AutomationSourcePayload, SaveAutomationPayload } from './api/facadeTypes'
 import { removeEmpty } from './utils/objects'
+import { SOURCE_TYPE_API } from './reconciliationRuleSetDraft'
 
 export const AUTOMATION_INPUT_MODE_API_RANGE = 'AUT_IN_API_RANGE'
 export const AUTOMATION_INPUT_MODE_SFTP_FILES = 'AUT_IN_SFTP_FILES'
-export const AUTOMATION_SOURCE_TYPE_API = 'AUT_SRC_API'
 const AUTOMATION_SOURCE_TYPE_SFTP = 'AUT_SRC_SFTP'
 export const AUTOMATION_WINDOW_PREVIOUS_DAY = 'AUT_WIN_PREV_DAY'
 export const AUTOMATION_WINDOW_PREVIOUS_WEEK = 'AUT_WIN_PREV_WEEK'
@@ -115,7 +115,7 @@ function buildSourcePayload(
   const savedRunSide = resolveSavedRunSide(savedRun, fileSide)
   const sourceTypeEnumId = draft.inputModeEnumId === AUTOMATION_INPUT_MODE_SFTP_FILES
     ? AUTOMATION_SOURCE_TYPE_SFTP
-    : AUTOMATION_SOURCE_TYPE_API
+    : SOURCE_TYPE_API
   const basePayload: Partial<AutomationSourcePayload> = removeEmpty({
     fileSide,
     sourceTypeEnumId,

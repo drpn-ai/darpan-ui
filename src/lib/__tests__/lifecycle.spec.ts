@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultLateAfter, lateAfterOptions, orderedStages, stageOptionLabel, stageReach } from '../lifecycleOptions'
+import { defaultLateAfter, lateAfterOptions, orderedStages, stageReach } from '../lifecycleOptions'
 import { isFindingPlace, lifecycleBoard } from '../lifecycleBoard'
 import type { FlowchartExecutionRow, FlowchartQuestion, LifecycleStageOption } from '../api/flowchartTypes'
 
@@ -13,11 +13,6 @@ const ship: LifecycleStageOption = {
 }
 
 describe('lifecycle options', () => {
-  it('labels a stage by its name alone', () => {
-    expect(stageOptionLabel(invoice)).toBe('Invoice')
-    expect(stageOptionLabel(ship)).toBe('Fulfillment')
-  })
-
   it('names how each chosen stage reached by a shared field is found, and nothing for a linked one', () => {
     const credit: LifecycleStageOption = { ...invoice, recordType: 'CustCred', label: 'Credit memo',
       reach: { startField: 'custbody_hc_return_id', stageField: 'custbody_hc_return_id', fieldLabel: 'HC Return Id' } }

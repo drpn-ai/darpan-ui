@@ -207,6 +207,7 @@ import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunSubmissionsStore, type RunSubmissionOutcome } from '../../stores/runSubmissions'
+import { SOURCE_TYPE_API } from '../../lib/reconciliationRuleSetDraft'
 
 interface UploadStep {
   id: 'run' | 'system-1' | 'api-window' | 'api-window-custom' | 'file-1' | 'system-2' | 'file-2'
@@ -224,7 +225,6 @@ interface UploadSourceInput {
   expectedFileType: ExpectedFileType
 }
 
-const SOURCE_TYPE_API = 'AUT_SRC_API'
 
 const route = useRoute()
 const router = useRouter()
