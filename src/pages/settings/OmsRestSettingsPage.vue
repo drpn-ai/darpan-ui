@@ -1,90 +1,35 @@
 <template>
-  <StaticPageFrame>
-    <template #hero>
-      <h1>HotWax</h1>
-    </template>
-
-    <SettingsRecordListSection
-      title="Auth"
-      :tiles="authTiles"
-      :page-index="authPageIndex"
-      :page-count="authPageCount"
-      pager-aria-label="HotWax auth pages"
-      previous-test-id="oms-auth-page-previous"
-      next-test-id="oms-auth-page-next"
-      :loading="authLoading"
-      loading-noun="auth configs"
-      :error="authError"
-      empty-title="No auth configs"
-      list-test-id="saved-oms-auth-configs"
-      tile-test-id="oms-auth-tile"
-      :can-create="canManageConnections"
-      :create-route="authCreateRoute"
-      create-label="Create Auth Profile"
-      create-test-id="oms-auth-create-action"
-      empty-create-test-id="oms-auth-create-action"
-      @update:page-index="goToAuthPage"
-    />
-  </StaticPageFrame>
+  <!-- HotWax connections. The record is HotWaxOmsRestSourceConfig by name only: the GraphQL connectors read it. -->
+  <ConnectionListPage
+    title="HotWax"
+    list-path="/settings/hotwax"
+    :section="{
+      title: 'Auth',
+      pagerAriaLabel: 'HotWax auth pages',
+      previousTestId: 'oms-auth-page-previous',
+      nextTestId: 'oms-auth-page-next',
+      loadingNoun: 'auth configs',
+      emptyTitle: 'No auth configs',
+      listTestId: 'saved-oms-auth-configs',
+      tileTestId: 'oms-auth-tile',
+      createLabel: 'Create Auth Profile',
+      createTestId: 'oms-auth-create-action',
+      emptyCreateTestId: 'oms-auth-create-action',
+    }"
+    :create-route="{ name: 'settings-oms-create' }"
+    :list="{
+      loadPage: (request) => settingsFacade.listOmsRestSourceConfigs(request),
+      selectRecords: (response) => response.omsRestSourceConfigs ?? [],
+      fallbackErrorMessage: 'The HotWax auth configs are stuck in the warehouse.',
+      cacheKey: SETTINGS_LIST_KEYS.oms,
+    }"
+    :id-of="(row) => row.omsRestSourceConfigId"
+    :record-route="(omsRestSourceConfigId) => ({ name: 'settings-oms-auth', params: { omsRestSourceConfigId } })"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import { settingsFacade } from '../../lib/api/facade'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
-import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { resolveRecordLabel } from '../../lib/utils/recordLabel'
-import SettingsRecordListSection from './SettingsRecordListSection.vue'
-import { useSettingsPagedList } from './useSettingsPagedList'
 import { SETTINGS_LIST_KEYS } from '../../lib/api/queries'
-
-const route = useRoute()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
-const draftStore = useReconciliationDraftStore()
-
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const {
-  rows: authRows,
-  pageIndex: authPageIndex,
-  pageCount: authPageCount,
-  loading: authLoading,
-  error: authError,
-  load,
-  goToPage: goToAuthPage,
-  dispose,
-} = useSettingsPagedList({
-  loadPage: (request) => settingsFacade.listOmsRestSourceConfigs(request),
-  selectRecords: (response) => response.omsRestSourceConfigs ?? [],
-  activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'The HotWax auth configs are stuck in the warehouse.',
-  cacheKey: SETTINGS_LIST_KEYS.oms,
-})
-
-onBeforeUnmount(() => {
-  dispose()
-})
-
-const authCreateRoute = computed(() => ({
-  name: 'settings-oms-create',
-}))
-const authTiles = computed(() => authRows.value.map((row) => ({
-  key: row.omsRestSourceConfigId,
-  label: resolveRecordLabel({
-    description: row.description,
-    fallbackId: row.omsRestSourceConfigId,
-  }),
-  to: {
-    name: 'settings-oms-auth',
-    params: { omsRestSourceConfigId: row.omsRestSourceConfigId },
-  },
-})))
-
-onMounted(() => {
-  draftStore.setWorkflowOrigin('HotWax', route.fullPath || '/settings/hotwax')
-  void load()
-})
+import ConnectionListPage from './ConnectionListPage.vue'
 </script>

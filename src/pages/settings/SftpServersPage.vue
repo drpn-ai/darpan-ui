@@ -1,88 +1,34 @@
 <template>
-  <StaticPageFrame>
-    <template #hero>
-      <h1>SFTP Servers</h1>
-    </template>
-
-    <SettingsRecordListSection
-      title="Saved Servers"
-      :tiles="recordTiles"
-      :page-index="pageIndex"
-      :page-count="pageCount"
-      pager-aria-label="SFTP server pages"
-      previous-test-id="sftp-page-previous"
-      next-test-id="sftp-page-next"
-      :loading="loading"
-      loading-noun="servers"
-      :error="error"
-      empty-title="No SFTP servers"
-      list-test-id="saved-sftp-servers"
-      tile-test-id="sftp-server-tile"
-      :can-create="canManageConnections"
-      :create-route="createRoute"
-      create-label="Create New Server"
-      create-test-id="sftp-create-action"
-      empty-create-test-id="sftp-empty-create-action"
-      @update:page-index="goToPage"
-    />
-  </StaticPageFrame>
+  <ConnectionListPage
+    title="SFTP Servers"
+    list-path="/settings/sftp"
+    :section="{
+      title: 'Saved Servers',
+      pagerAriaLabel: 'SFTP server pages',
+      previousTestId: 'sftp-page-previous',
+      nextTestId: 'sftp-page-next',
+      loadingNoun: 'servers',
+      emptyTitle: 'No SFTP servers',
+      listTestId: 'saved-sftp-servers',
+      tileTestId: 'sftp-server-tile',
+      createLabel: 'Create New Server',
+      createTestId: 'sftp-create-action',
+      emptyCreateTestId: 'sftp-empty-create-action',
+    }"
+    :create-route="{ path: '/settings/sftp/create' }"
+    :list="{
+      loadPage: (request) => settingsFacade.listSftpServers(request),
+      selectRecords: (response) => response.servers ?? [],
+      fallbackErrorMessage: 'The servers are not serving today.',
+      cacheKey: SETTINGS_LIST_KEYS.sftp,
+    }"
+    :id-of="(row) => row.sftpServerId"
+    :record-route="(sftpServerId) => ({ name: 'settings-sftp-edit', params: { sftpServerId } })"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import { settingsFacade } from '../../lib/api/facade'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
-import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { resolveRecordLabel } from '../../lib/utils/recordLabel'
-import SettingsRecordListSection from './SettingsRecordListSection.vue'
-import { useSettingsPagedList } from './useSettingsPagedList'
 import { SETTINGS_LIST_KEYS } from '../../lib/api/queries'
-
-const route = useRoute()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
-const draftStore = useReconciliationDraftStore()
-
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const {
-  rows,
-  pageIndex,
-  pageCount,
-  loading,
-  error,
-  load,
-  goToPage,
-  dispose,
-} = useSettingsPagedList({
-  loadPage: (request) => settingsFacade.listSftpServers(request),
-  selectRecords: (response) => response.servers ?? [],
-  activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'The servers are not serving today.',
-  cacheKey: SETTINGS_LIST_KEYS.sftp,
-})
-
-onBeforeUnmount(() => {
-  dispose()
-})
-
-const createRoute = computed(() => ({ path: '/settings/sftp/create' }))
-const recordTiles = computed(() => rows.value.map((row) => ({
-  key: row.sftpServerId,
-  label: resolveRecordLabel({
-    description: row.description,
-    fallbackId: row.sftpServerId,
-  }),
-  to: {
-    name: 'settings-sftp-edit',
-    params: { sftpServerId: row.sftpServerId },
-  },
-})))
-
-onMounted(() => {
-  draftStore.setWorkflowOrigin('SFTP Servers', route.fullPath || '/settings/sftp')
-  void load()
-})
+import ConnectionListPage from './ConnectionListPage.vue'
 </script>

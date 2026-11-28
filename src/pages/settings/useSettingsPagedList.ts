@@ -13,11 +13,11 @@ interface PageRequest extends Record<string, unknown> {
   pageSize: number
 }
 
-interface PaginatedSettingsResponse {
+export interface PaginatedSettingsResponse {
   pagination?: Partial<PaginationMeta> | null
 }
 
-interface UseSettingsPagedListOptions<T extends object, R extends PaginatedSettingsResponse> {
+export interface UseSettingsPagedListOptions<T extends object, R extends PaginatedSettingsResponse> {
   pageSize?: number
   loadPage: (request: PageRequest, signal?: AbortSignal) => Promise<R>
   selectRecords: (response: R) => T[] | undefined

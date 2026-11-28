@@ -59,7 +59,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 
-interface SettingsRecordTile {
+export interface SettingsRecordTile {
   key: string
   label: string
   to: RouteLocationRaw

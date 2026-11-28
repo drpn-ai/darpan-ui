@@ -1,90 +1,34 @@
 <template>
-  <StaticPageFrame>
-    <template #hero>
-      <h1>Shopify</h1>
-    </template>
-
-    <SettingsRecordListSection
-      title="Saved Configs"
-      :tiles="recordTiles"
-      :page-index="pageIndex"
-      :page-count="pageCount"
-      pager-aria-label="Shopify config pages"
-      previous-test-id="shopify-page-previous"
-      next-test-id="shopify-page-next"
-      :loading="loading"
-      loading-noun="Shopify configs"
-      :error="error"
-      empty-title="No Shopify configs"
-      list-test-id="saved-shopify-configs"
-      tile-test-id="shopify-auth-tile"
-      :can-create="canManageConnections"
-      :create-route="createRoute"
-      create-label="Create Shopify Config"
-      create-test-id="shopify-create-action"
-      empty-create-test-id="shopify-empty-create-action"
-      @update:page-index="goToPage"
-    />
-  </StaticPageFrame>
+  <ConnectionListPage
+    title="Shopify"
+    list-path="/settings/shopify"
+    :section="{
+      title: 'Saved Configs',
+      pagerAriaLabel: 'Shopify config pages',
+      previousTestId: 'shopify-page-previous',
+      nextTestId: 'shopify-page-next',
+      loadingNoun: 'Shopify configs',
+      emptyTitle: 'No Shopify configs',
+      listTestId: 'saved-shopify-configs',
+      tileTestId: 'shopify-auth-tile',
+      createLabel: 'Create Shopify Config',
+      createTestId: 'shopify-create-action',
+      emptyCreateTestId: 'shopify-empty-create-action',
+    }"
+    :create-route="{ name: 'settings-shopify-create' }"
+    :list="{
+      loadPage: (request) => settingsFacade.listShopifyAuthConfigs(request),
+      selectRecords: (response) => response.shopifyAuthConfigs ?? [],
+      fallbackErrorMessage: 'The Shopify configs are still out shopping.',
+      cacheKey: SETTINGS_LIST_KEYS.shopify,
+    }"
+    :id-of="(row) => row.shopifyAuthConfigId"
+    :record-route="(shopifyAuthConfigId) => ({ name: 'settings-shopify-auth', params: { shopifyAuthConfigId } })"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import { settingsFacade } from '../../lib/api/facade'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
-import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { resolveRecordLabel } from '../../lib/utils/recordLabel'
-import SettingsRecordListSection from './SettingsRecordListSection.vue'
-import { useSettingsPagedList } from './useSettingsPagedList'
 import { SETTINGS_LIST_KEYS } from '../../lib/api/queries'
-
-const route = useRoute()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
-const draftStore = useReconciliationDraftStore()
-
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const {
-  rows,
-  pageIndex,
-  pageCount,
-  loading,
-  error,
-  load,
-  goToPage,
-  dispose,
-} = useSettingsPagedList({
-  loadPage: (request) => settingsFacade.listShopifyAuthConfigs(request),
-  selectRecords: (response) => response.shopifyAuthConfigs ?? [],
-  activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'The Shopify configs are still out shopping.',
-  cacheKey: SETTINGS_LIST_KEYS.shopify,
-})
-
-onBeforeUnmount(() => {
-  dispose()
-})
-
-const createRoute = computed(() => ({
-  name: 'settings-shopify-create',
-}))
-const recordTiles = computed(() => rows.value.map((row) => ({
-  key: row.shopifyAuthConfigId,
-  label: resolveRecordLabel({
-    description: row.description,
-    fallbackId: row.shopifyAuthConfigId,
-  }),
-  to: {
-    name: 'settings-shopify-auth',
-    params: { shopifyAuthConfigId: row.shopifyAuthConfigId },
-  },
-})))
-
-onMounted(() => {
-  draftStore.setWorkflowOrigin('Shopify', route.fullPath || '/settings/shopify')
-  void load()
-})
+import ConnectionListPage from './ConnectionListPage.vue'
 </script>
