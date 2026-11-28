@@ -327,7 +327,7 @@ describe('ReconciliationConclusionsEditorPage', () => {
 
     expect(saveRunConclusions).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
-    expect(useMascotStore().tipText).toBe('Save waits until every conclusion has a name and a line, and every line is finished.')
+    expect(useMascotStore().tipText).toBe('Save waits until every conclusion has a name and a finished line, and any the tree cannot place is deleted.')
   })
 
   it('back with unsaved changes asks first, once', async () => {

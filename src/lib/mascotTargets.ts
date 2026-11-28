@@ -103,6 +103,8 @@ export const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'endpoint': 'endpoint',
   'api config': 'connection',
   'field': 'sourceField',
+  // The schema editor and wizard title their field table's column this way.
+  'field path': 'sourceField',
   'base url': 'baseUrl',
   'shop/api url': 'baseUrl',
   'token url': 'tokenUrl',
@@ -168,6 +170,8 @@ export const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // Explicit, because flowchartFindings carries the same title: on the audit report "Findings" is
   // the open-until-cleared ledger. The flowchart page points at its own meaning with v-explain.
   'findings': 'auditFindings',
+  // The run result's diff table heads each row's conclusion this way once a run has conclusions.
+  'conclusion': 'runConclusions',
 
   // Setup forms (DAR-UI-103). Generic words (Username, Password, Host, Expires, Name, Time, Day) are
   // NOT here: each form points at its own meaning with v-explain, and those entries stay out of the index.

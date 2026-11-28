@@ -293,6 +293,15 @@ describe('every label in the app has an answer', () => {
     'enabled': 'AI Configuration stores it and nothing reads it (DAR-BE-213) — any consequence would be invented',
   }
 
+  /**
+   * Silent in one place only, keyed `<file>: "<label>"` as the sweep reports it, so a generic word stays a gap
+   * everywhere else it shows up.
+   */
+  const SILENT_HERE: Readonly<Record<string, string>> = {
+    'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Values"': 'match-rule table column; the Add match rule button below it says what a rule does',
+    'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Column"': 'column-editor table column; the Add column button below it says what a column can be',
+  }
+
   const LABELS = 'th, dt, legend, h1, h2, h3, h4, h5, h6, .static-page-section-heading, [class*="label"], [class*="eyebrow"]'
   const CONTROLS = 'button, a, [role="button"]'
 
@@ -346,19 +355,24 @@ describe('every label in the app has an answer', () => {
         if (!resolveExplainTarget(el) && !SILENT[text.toLowerCase()]) unanswered.push(`${relative}: "${text}"`)
       }
     }
-    // DAR-OPS-029: real gaps found by the label-literal sweep; U14 answers them (glossary or SILENT reason) and removes each line.
-    const KNOWN_GAPS = [
-      'pages/jsonschema/JsonSchemaEditorPage.vue: "Field Path"',
-      'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Values"',
-      'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Column"',
-      'pages/reconciliation/ReconciliationRunResultPage.vue: "Conclusion"',
-      'pages/settings/TenantScriptPage.vue: "Sends as"',
-    ]
     expect(FILES.length, 'no components were swept — the glob is wrong').toBeGreaterThan(80)
     expect(swept, 'no labels were swept — the markup rewrite is wrong').toBeGreaterThan(150)
-    expect(KNOWN_GAPS.filter((gap) => !unanswered.includes(gap)), 'answered now: remove it from KNOWN_GAPS').toEqual([])
-    const fresh = unanswered.filter((gap) => !KNOWN_GAPS.includes(gap))
+    expect(Object.keys(SILENT_HERE).filter((gap) => !unanswered.includes(gap)), 'answered or gone now: remove it from SILENT_HERE').toEqual([])
+    const fresh = unanswered.filter((gap) => !SILENT_HERE[gap])
     expect(fresh, `labels with no answer:\n${fresh.join('\n')}`).toEqual([])
+  })
+
+  /** DAR-OPS-029 U14: the five labels the label-literal sweep found unanswered now answer as their page means them. */
+  it('answers the script-drawn labels by the meaning they have on their page', () => {
+    const label = (text: string) => {
+      const el = document.createElement('span')
+      el.className = 'static-page-summary-label'
+      el.textContent = text
+      return resolveExplainTarget(el)?.term
+    }
+    expect(label('Sends as')).toBe('scriptSendsAs')
+    expect(label('Conclusion')).toBe('runConclusions')
+    expect(label('Field Path')).toBe('sourceField')
   })
 
   /**

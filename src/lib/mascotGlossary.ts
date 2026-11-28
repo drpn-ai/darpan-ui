@@ -898,6 +898,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Sends to',
     body: 'where the answer goes: email addresses get the summary and the files, a chat space gets the summary. If the owner leaves the tenant, the schedule switches off.',
   },
+  // DAR-OPS-029 U14: the query page's "Sends as" fact (U09). Only that fact says it, so it is in the shared index.
+  scriptSendsAs: {
+    title: 'Sends as',
+    body: 'whose access the schedule reads and sends with: whoever last saved it. If they leave the tenant, the schedule switches off.',
+  },
   scriptEmailTo: {
     title: 'Email to',
     body: 'any addresses, inside or outside your company, separated by commas. Every file sent is logged with who it went to.',
@@ -1092,11 +1097,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
 })
 
-/** Null rather than a throw: a missing phrase is a content gap, not a crash. */
 /**
  * One lookup over two registries. Nouns are keyed by stable id, actions by the control's
  * own name, so the two key spaces cannot collide and the caller does not have to know
- * which kind of question it asked.
+ * which kind of question it asked. Null rather than a throw: a missing phrase is a content
+ * gap, not a crash.
  */
 export function lookupGlossary(term: string | null | undefined): GlossaryEntry | null {
   if (!term) return null

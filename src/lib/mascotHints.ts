@@ -55,17 +55,17 @@ const RUN_RESULT_HINTS: readonly Hint[] = Object.freeze([
 ])
 
 export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.freeze({
-  // RuleSetBoard: @dblclick opens the filter editor, pointerdown/up draws a pairing,
-  // and Enter is the keyboard equivalent of the drag.
+  // RuleSetBoard: @dblclick or Enter on a field opens its filter editor, and pointerdown/up draws a pairing.
+  // Pairing has no keyboard gesture (D6, 2026-11-28).
   'reconciliation-ruleset-editor': Object.freeze([
-    { id: 'ruleset-field-list-file1', text: 'Double-click a field to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
+    { id: 'ruleset-field-list-file1', text: 'Double-click a field, or press Enter on it, to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
     { id: 'ruleset-editor-board', text: 'Drag from a field on one side to a field on the other to pair them.', when: control('ruleset-editor-board') },
     { id: 'every-source-can-filter', text: 'Not every source can filter at the pull — a side that cannot will say so.' },
-    { id: 'ruleset-editor-board-2', text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
   ]),
-  // DAR-UI-135: the conclusions edit page. Save is off while a conclusion has no name, no line, or an unfinished line.
+  // DAR-UI-135: the conclusions edit page. Save is off while a conclusion has no name, no line, or an unfinished line,
+  // or while one is flagged as a conclusion the tree cannot place (OC37).
   'reconciliation-conclusions-editor': Object.freeze([
-    { id: 'conclusions-save-blocked', text: 'Save waits until every conclusion has a name and a line, and every line is finished.', when: control('conclusions-save-blocked') },
+    { id: 'conclusions-save-blocked', text: 'Save waits until every conclusion has a name and a finished line, and any the tree cannot place is deleted.', when: control('conclusions-save-blocked') },
     { id: 'conclusions-editor-row', text: 'Open a conclusion, then click any part of it to change just that part.', when: control('conclusions-editor-row') },
     { id: 'first-match-wins', text: 'Conclusions are tried top to bottom; the first that holds names the row.' },
   ]),
