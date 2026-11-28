@@ -350,7 +350,7 @@ describe('every label in the app has an answer', () => {
   it('gives a word that means different things on different pages its own meaning there', () => {
     const PINNED: readonly (readonly [string, string, string, number])[] = [
       ['pages/reconciliation/ReconciliationAutomationWorkflowPage.vue', 'Status', 'activeFlag', 1],
-      ['pages/reconciliation/ReconciliationAutomationWorkflowPage.vue', 'Run', 'automationSchedule', 2],
+      ['pages/reconciliation/ReconciliationAutomationWorkflowPage.vue', 'Run', 'automationSchedule', 1],
       ['components/audit/AuditCheckEditor.vue', 'Run', 'savedRun', 1],
       ['pages/reconciliation/AuditSettingsPage.vue', 'Schedule', 'auditScheduleTime', 1],
       ['pages/settings/NetSuiteAuthDashboardPage.vue', 'Active', 'connectionActive', 1],
