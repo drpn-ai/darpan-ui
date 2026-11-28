@@ -7,17 +7,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import AppIcon from '../../components/ui/AppIcon.vue'
-
-const emit = defineEmits<{
-  reconnect: []
-}>()
+import AppIcon from '../ui/AppIcon.vue'
 
 const isOffline = ref(!navigator.onLine)
 
 function handleOnline(): void {
   isOffline.value = false
-  emit('reconnect')
 }
 
 function handleOffline(): void {
@@ -59,7 +54,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   color: var(--text-dim);
 }
-
 
 .offline-banner__text {
   line-height: 1.4;

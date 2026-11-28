@@ -102,10 +102,8 @@ function close(): void {
   mascot.closeWarnings()
 }
 
-/* Dismissing must not drop focus onto the document body: a keyboard reader would be returned to
-   the top of the page having lost their place. The dock owns the face, so hand it back there. */
-/* Acknowledges the ONE on screen and advances. Focus only returns to the face when that was the
-   last of them — otherwise the reader is still in the dialog, looking at the next warning. */
+/* Acknowledges the ONE on screen and advances. Focus stays in the dialog while warnings remain, and
+   returns to the face after the last one: dropped on the body, a keyboard reader would lose their place. */
 async function dismiss(): Promise<void> {
   mascot.dismissCurrent()
   await nextTick()
@@ -121,8 +119,8 @@ watch(() => mascot.popupOpen, async (open) => {
   dismissEl.value?.focus()
 })
 
-/* Escape is listened for on the document as well as the panel: the panel only sees the key once
-   focus is inside it, and an outside click is not the only way someone leaves. */
+/* Escape is listened for on the document, not the panel: the panel would only see the key once focus
+   is inside it, and an outside click is not the only way someone leaves. */
 function onDocumentKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape' || !mascot.popupOpen) return
   close()

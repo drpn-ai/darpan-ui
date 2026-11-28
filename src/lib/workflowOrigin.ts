@@ -1,9 +1,7 @@
 import type { HistoryState } from 'vue-router'
 
-// WorkflowOrigin state management has moved to src/stores/reconciliationDraft.ts.
-// This file keeps pure utility functions and the serialization helpers used by
-// route history state payloads (which can't use reactive Pinia store refs).
-export type { WorkflowOrigin } from '../stores/reconciliationDraft'
+// The workflow origin itself lives in stores/reconciliationDraft.ts. These are the pure helpers: the payload a
+// route's history state carries (state cannot hold reactive store refs) and a static page's label.
 
 // Keys used when embedding workflow-origin data in Vue Router history state.
 export const WORKFLOW_ORIGIN_LABEL_KEY = 'workflowOriginLabel'
