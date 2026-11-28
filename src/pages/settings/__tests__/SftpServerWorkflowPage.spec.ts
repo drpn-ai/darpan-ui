@@ -462,7 +462,8 @@ describe('SftpServerWorkflowPage', () => {
     const workflowSource = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
     const pageSource = readFileSync('src/pages/settings/SftpServerWorkflowPage.vue', 'utf8')
 
-    expect(pageSource).toContain("'workflow-form--compact'")
+    expect(pageSource).toContain('v-bind="formBindings"')
+    expect(readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')).toContain("'workflow-form--compact'")
     expect(source).toContain('.workflow-form--compact {')
     expect(source).toContain('--workflow-form-answer-size: clamp(1.18rem, 1.4vw, 1.45rem);')
     expect(workflowSource).toContain('font-size: var(--workflow-form-answer-size);')

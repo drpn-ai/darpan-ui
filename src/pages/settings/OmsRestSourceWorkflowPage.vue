@@ -1,26 +1,13 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="HotWax source setup progress" center-stage :edit-surface="isEditing">
+  <WorkflowPage v-bind="pageBindings" aria-label="HotWax source setup progress">
     <InlineValidation v-if="error" tone="error" :message="error" />
     <p v-if="success" class="success-copy">{{ success }}</p>
 
     <WorkflowStepForm
-      :class="[
-        'workflow-form--compact',
-        {
-          'workflow-form--edit-single-page': isEditing,
-        },
-      ]"
-      :question="currentQuestion"
-      :primary-label="primaryLabel"
-      :primary-action-variant="primaryActionVariant"
+      v-bind="formBindings"
       :show-enter-hint="!isEditing && !isCreateChoiceStep"
-      :show-back="showBack"
-      :show-cancel-action="isEditing"
-      :cancel-disabled="loading"
-      cancel-test-id="cancel-oms-rest-source"
-      :submit-disabled="submitDisabled"
       :show-primary-action="canManageConnections && !isCreateChoiceStep"
-      :primary-test-id="primaryTestId"
+      cancel-test-id="cancel-oms-rest-source"
       @submit="handlePrimarySubmit"
       @back="goBack"
       @cancel="cancelEdit"
@@ -210,9 +197,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
   type WorkflowShortcutChoiceOption,
@@ -222,28 +208,20 @@ import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.v
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
 import EndpointAccessPanel, { type EndpointAccessLoadState } from '../../components/settings/EndpointAccessPanel.vue'
-import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { OmsRestSourceConfigRecord } from '../../lib/api/types'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
-import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useConnectionWorkflow, type ConnectionSaveOutcome } from './useConnectionWorkflow'
+import { findTenantRecord } from './useSettingsPagedList'
 
-type OmsCreateStepId =
-  | 'baseUrl'
-  | 'timeZone'
-  | 'authType'
-  | 'username'
-  | 'password'
-  | 'apiToken'
-  | 'description'
+// A HotWax connection. The record is HotWaxOmsRestSourceConfig by name only: the GraphQL connectors read it.
+
+type OmsCreateStepId = 'baseUrl' | 'timeZone' | 'authType' | 'username' | 'password' | 'apiToken' | 'description'
 
 interface OmsCreateStep {
   id: OmsCreateStepId
   title: string
-  kind: 'text' | 'password' | 'textarea' | 'number' | 'select' | 'choice'
 }
 
 interface OmsForm {
@@ -260,11 +238,6 @@ interface OmsForm {
   isActive: string
   enabledEndpoints: string[]
 }
-
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
 
 function createDefaultOmsForm(): OmsForm {
   return {
@@ -283,119 +256,99 @@ function createDefaultOmsForm(): OmsForm {
   }
 }
 
-const form = reactive<OmsForm>(createDefaultOmsForm())
-
 const authTypeOptions: AppSelectOption[] = [
   { value: 'NONE', label: 'None' },
   { value: 'BASIC', label: 'Basic' },
   { value: 'BEARER', label: 'Bearer' },
   { value: 'API_KEY', label: 'API Key' },
 ]
-const authTypeChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
-  authTypeOptions.map((option, index) => ({
-    value: option.value,
-    label: option.label,
-    shortcutKey: ['A', 'B', 'C', 'D'][index] ?? String(index + 1),
-  })),
-)
-const loading = ref(false)
-const error = ref<string | null>(null)
-const success = ref<string | null>(null)
-const currentStepIndex = ref(0)
+const authTypeChoiceOptions: WorkflowShortcutChoiceOption[] = authTypeOptions.map((option, index) => ({
+  value: option.value,
+  label: option.label,
+  shortcutKey: ['A', 'B', 'C', 'D'][index] ?? String(index + 1),
+}))
+// A sample host for the hint only, never a live target.
+const omsBaseUrlPlaceholder = 'https://dev-maarg.hotwax.io'
+
+const route = useRoute()
+const activeOmsConfigId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
+const form = reactive<OmsForm>(createDefaultOmsForm())
 // Reported by EndpointAccessPanel (see its own `update:loadState` doc comment). Starts 'loading' so
 // a Save clicked before the panel's first emit ever arrives is treated the same as an in-flight or
 // failed read -- never as an implicit "everything disabled".
 const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
-
-const activeOmsConfigId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const isEditing = computed(() => activeOmsConfigId.value.length > 0)
 const isActiveChecked = computed({
   get: () => form.isActive !== 'N',
   set: (checked: boolean) => {
     form.isActive = checked ? 'Y' : 'N'
   },
 })
-
 const isBasicAuth = computed(() => form.authType === 'BASIC')
-const isBearerAuth = computed(() => form.authType === 'BEARER')
 const isApiKeyAuth = computed(() => form.authType === 'API_KEY')
-const isApiTokenAuth = computed(() => isBearerAuth.value || isApiKeyAuth.value)
+const isApiTokenAuth = computed(() => form.authType === 'BEARER' || isApiKeyAuth.value)
 const apiTokenLabel = computed(() => (isApiKeyAuth.value ? 'API Key' : 'API Token'))
-// A sample host for the hint only, never a live target.
-const omsBaseUrlPlaceholder = 'https://dev-maarg.hotwax.io'
-const createSteps = computed<OmsCreateStep[]>(() => {
-  const steps: OmsCreateStep[] = [
-    { id: 'baseUrl', title: 'What HotWax base URL should Darpan use?', kind: 'text' },
-    { id: 'timeZone', title: 'Which timezone should Darpan use for HotWax date windows?', kind: 'select' },
-    { id: 'authType', title: 'Which HotWax auth type should Darpan use?', kind: 'choice' },
-  ]
+const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(normalizeTimezoneId(form.timeZone) || 'UTC'))
+const createSteps = computed<OmsCreateStep[]>(() => [
+  { id: 'baseUrl', title: 'What HotWax base URL should Darpan use?' },
+  { id: 'timeZone', title: 'Which timezone should Darpan use for HotWax date windows?' },
+  { id: 'authType', title: 'Which HotWax auth type should Darpan use?' },
+  ...(isBasicAuth.value
+    ? [
+      { id: 'username', title: 'What username should Darpan use?' } as const,
+      { id: 'password', title: 'What password should Darpan use?' } as const,
+    ]
+    : []),
+  ...(isApiTokenAuth.value
+    ? [{ id: 'apiToken', title: isApiKeyAuth.value ? 'What API key should Darpan use?' : 'What API token should Darpan use?' } as const]
+    : []),
+  { id: 'description', title: 'What label should Darpan show for this HotWax source?' },
+])
 
-  if (isBasicAuth.value) {
-    steps.push(
-      { id: 'username', title: 'What username should Darpan use?', kind: 'text' },
-      { id: 'password', title: 'What password should Darpan use?', kind: 'password' },
-    )
-  }
+function dashboardRoute(omsRestSourceConfigId: string) {
+  return { name: 'settings-oms-auth', params: { omsRestSourceConfigId } }
+}
 
-  if (isApiTokenAuth.value) {
-    steps.push({
-      id: 'apiToken',
-      title: isApiKeyAuth.value ? 'What API key should Darpan use?' : 'What API token should Darpan use?',
-      kind: 'password',
-    })
-  }
-
-  steps.push(
-    { id: 'description', title: 'What label should Darpan show for this HotWax source?', kind: 'text' },
-  )
-
-  return steps
-})
 const {
+  isEditing,
+  canManageConnections,
+  loading,
+  error,
+  success,
+  pageBindings,
+  formBindings,
   currentCreateStep,
-  progressPercent,
-  currentQuestion,
-  primaryLabel,
-  primaryTestId,
-  primaryActionVariant,
-  showBack,
   goNext,
   goBack,
-} = useWorkflowStepMachine<OmsCreateStep>({
+  handlePrimarySubmit,
+  cancelEdit,
+} = useConnectionWorkflow<OmsCreateStep>({
+  configId: () => activeOmsConfigId.value,
   steps: createSteps,
-  currentStepIndex,
-  isEditing,
   editQuestion: 'Update the HotWax source config.',
-  finalStepId: 'description',
   saveTestId: 'save-oms-rest-source',
-  error,
+  // The auth type is a choice card: picking one is the answer.
+  stepBlocked: (step) => step.id !== 'authType' && form[step.id].trim().length === 0,
+  resetCreate: () => Object.assign(form, createDefaultOmsForm()),
+  load: async (configId, signal) => {
+    if (!configId) return
+    const response = await settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 }, signal)
+    const record = findTenantRecord(response.omsRestSourceConfigs, (config) => config.omsRestSourceConfigId === configId)
+    if (!record) return `HotWax source config "${configId}" is nowhere to be found. We asked twice.`
+    applyRecord(record)
+  },
+  loadFailedMessage: 'The HotWax source config is stuck in the warehouse.',
+  permissionMessage: 'You do not have permission to save HotWax settings for the active tenant.',
+  save,
+  saveFailedMessage: 'The HotWax source config slipped off the shelf. Not saved.',
+  cancelRoute: () => dashboardRoute(activeOmsConfigId.value),
 })
-const isCreateChoiceStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'choice')
-const selectedTimeZone = computed(() => normalizeTimezoneId(form.timeZone) || 'UTC')
-const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
-const submitDisabled = computed(() => {
-  if (!canManageConnections.value) return true
-  if (loading.value) return true
-  if (isEditing.value) return false
+const isCreateChoiceStep = computed(() => !isEditing.value && currentCreateStep.value.id === 'authType')
 
-  switch (currentCreateStep.value.id) {
-    case 'baseUrl':
-      return form.baseUrl.trim().length === 0
-    case 'timeZone':
-      return form.timeZone.trim().length === 0
-    case 'username':
-      return form.username.trim().length === 0
-    case 'password':
-      return form.password.trim().length === 0
-    case 'apiToken':
-      return form.apiToken.trim().length === 0
-    case 'description':
-      return form.description.trim().length === 0
-    default:
-      return false
-  }
-})
+function advanceFromAuthTypeChoice(value: string): void {
+  if (!canManageConnections.value || currentCreateStep.value.id !== 'authType') return
+  form.authType = value
+  goNext()
+}
 
 function applyRecord(record: OmsRestSourceConfigRecord): void {
   form.description = record.description ?? ''
@@ -409,168 +362,52 @@ function applyRecord(record: OmsRestSourceConfigRecord): void {
   form.connectTimeoutSeconds = record.connectTimeoutSeconds ?? 30
   form.readTimeoutSeconds = record.readTimeoutSeconds ?? 60
   form.isActive = record.isActive ?? 'Y'
-  // Do NOT touch form.enabledEndpoints or endpointsLoadState here. EndpointAccessPanel is the sole
-  // writer of both: its own props watcher (configType/configId, both derived from the same route
-  // param this function reacts to) fires synchronously on the exact same identity change and emits
-  // 'loading' before it even awaits its fetch, then reseeds modelValue and emits 'ready'/'error' once
-  // that fetch settles. This function's caller (loadOmsConfig) and the panel's load() are two
-  // independent network calls with no ordering guarantee -- writing to these two fields from BOTH
-  // places races. It used to race, and losing was silent and destructive: verified live, a Shopify
-  // config whose config fetch resolved after its endpoints fetch rendered every endpoint UNTICKED
-  // even though the database had zero override rows (absent rows = enabled), i.e. this function's
-  // reset clobbered the panel's already-correct 'ready' seed. Leaving both fields alone here removes
-  // this function from the race entirely, so the outcome no longer depends on fetch ordering.
+  // Do NOT touch form.enabledEndpoints or endpointsLoadState here: EndpointAccessPanel is their sole writer.
+  // The config read and the panel's read are independent calls with no ordering guarantee; writing these
+  // fields from both raced, and a config whose read landed after its endpoints read showed every endpoint
+  // unticked (verified live; see ShopifyAuthWorkflowPage.applyRecord).
 }
 
-function resetCreateForm(): void {
-  Object.assign(form, createDefaultOmsForm())
-  currentStepIndex.value = 0
-  error.value = null
-  success.value = null
-}
+async function save(): Promise<ConnectionSaveOutcome> {
+  const editing = isEditing.value
+  // A Save clicked while the panel's read is still in flight, or after it failed, means
+  // enabledEndpoints does not reflect confirmed server truth -- see the guard below.
+  const endpointsReady = endpointsLoadState.value === 'ready'
 
-function buildOmsSourceDashboardRoute(omsRestSourceConfigId: string) {
-  return {
-    name: 'settings-oms-auth',
-    params: { omsRestSourceConfigId },
-  }
-}
+  const response = await settingsFacade.saveOmsRestSourceConfig({
+    ...(editing ? { omsRestSourceConfigId: activeOmsConfigId.value } : {}),
+    description: form.description.trim(),
+    baseUrl: form.baseUrl.trim(),
+    timeZone: normalizeTimezoneId(form.timeZone) || 'UTC',
+    authType: form.authType,
+    username: isBasicAuth.value ? form.username.trim() : '',
+    password: isBasicAuth.value ? form.password.trim() : '',
+    apiToken: isApiTokenAuth.value ? form.apiToken.trim() : '',
+    headersJson: form.headersJson.trim(),
+    connectTimeoutSeconds: form.connectTimeoutSeconds,
+    readTimeoutSeconds: form.readTimeoutSeconds,
+    isActive: form.isActive === 'Y',
+    // Dead column (nothing reads it; endpoint access replaced it). 'Y' because the one-time ENDPOINT_ACCESS
+    // migration turns an 'N' into every endpoint disabled.
+    canReadOrders: true,
+  })
+  const message = response.messages?.[0] ?? 'Saved HotWax source config.'
+  if (!editing) return { to: '/settings/hotwax', message }
 
-const pageAbortController = new AbortController()
-let loadController: AbortController | null = null
-
-onBeforeUnmount(() => {
-  pageAbortController.abort()
-  loadController?.abort()
-})
-
-async function loadOmsConfig(signal?: AbortSignal): Promise<void> {
-  if (!isEditing.value) return
-
-  const response = await settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 }, signal)
-  const matchingConfig = filterRecordsForActiveTenant(
-    response.omsRestSourceConfigs ?? [],
-    authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  ).find((config) => config.omsRestSourceConfigId === activeOmsConfigId.value)
-  if (!matchingConfig) {
-    error.value = `HotWax source config "${activeOmsConfigId.value}" is nowhere to be found. We asked twice.`
-    return
-  }
-  applyRecord(matchingConfig)
-}
-
-async function load(): Promise<void> {
-  loading.value = true
-  error.value = null
-  success.value = null
-  if (!isEditing.value) resetCreateForm()
-
-  loadController?.abort()
-  loadController = new AbortController()
-  const signal = loadController.signal
-
-  try {
-    await loadOmsConfig(signal)
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'The HotWax source config is stuck in the warehouse.'
-  } finally {
-    loading.value = false
-  }
-}
-
-function advanceFromAuthTypeChoice(value: string): void {
-  if (!canManageConnections.value || currentCreateStep.value.id !== 'authType') return
-
-  form.authType = value
-  goNext()
-}
-
-async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'description') {
-    await save()
-    return
+  if (!endpointsReady) {
+    // storeAccess disables every catalog endpoint NOT in the list it is given, so writing an unconfirmed
+    // set would silently disable endpoints the user never touched. Skip the write and stay on the page so
+    // the notice is seen; the config fields above are already saved.
+    return { error: 'Saved the HotWax source config, but endpoint access could not be verified and was left unchanged. Reload this page and try again.' }
   }
 
-  goNext()
+  // Stored after the config save on purpose: access rows for a config that failed to save would be
+  // orphans this table has no FK to clean up.
+  await settingsFacade.storeSourceConfigEndpointAccess({
+    configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms,
+    configId: activeOmsConfigId.value,
+    enabledSystemEnumIds: form.enabledEndpoints,
+  })
+  return { to: dashboardRoute(activeOmsConfigId.value), message }
 }
-
-async function save(): Promise<void> {
-  if (!canManageConnections.value) {
-    error.value = 'You do not have permission to save HotWax settings for the active tenant.'
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  success.value = null
-  try {
-    // A Save clicked while the panel's read is still in flight, or after it failed, means
-    // enabledEndpoints does not reflect confirmed server truth -- see the guard below.
-    const endpointsReady = endpointsLoadState.value === 'ready'
-
-    const response = await settingsFacade.saveOmsRestSourceConfig({
-      ...(isEditing.value ? { omsRestSourceConfigId: activeOmsConfigId.value } : {}),
-      description: form.description.trim(),
-      baseUrl: form.baseUrl.trim(),
-      timeZone: normalizeTimezoneId(form.timeZone) || 'UTC',
-      authType: form.authType,
-      username: isBasicAuth.value ? form.username.trim() : '',
-      password: isBasicAuth.value ? form.password.trim() : '',
-      apiToken: isApiTokenAuth.value ? form.apiToken.trim() : '',
-      headersJson: form.headersJson.trim(),
-      connectTimeoutSeconds: form.connectTimeoutSeconds,
-      readTimeoutSeconds: form.readTimeoutSeconds,
-      isActive: form.isActive === 'Y',
-      // Dead column (nothing reads it; endpoint access replaced it). 'Y' because the one-time ENDPOINT_ACCESS
-      // migration turns an 'N' into every endpoint disabled.
-      canReadOrders: true,
-    })
-
-    if (isEditing.value) {
-      if (!endpointsReady) {
-        // The panel never confirmed a real read for this identity (still loading, or its own
-        // fetch failed) -- enabledEndpoints is not trustworthy. storeAccess disables every
-        // catalog endpoint that is NOT in the list it's given, so writing an unconfirmed set here
-        // would silently disable endpoints the user never touched. Skip the write (existing
-        // access rows are left untouched -- the non-destructive outcome), and stay on this page
-        // instead of navigating away as if the whole save succeeded, so the notice below is seen.
-        // The config fields above (e.g. Base URL) are already saved at this point, so a user who
-        // only came here to fix one of those is not stranded -- their edit is durable either way.
-        error.value = 'Saved the HotWax source config, but endpoint access could not be verified and was left unchanged. Reload this page and try again.'
-        return
-      }
-
-      // Endpoint enablement is stored separately because it is generic across config types. The
-      // config save must land first: storing access rows for a config that failed to save would
-      // leave orphans this table has no FK to clean up (hence this sitting after the call above,
-      // inside the same try so a config-save failure skips it entirely via the catch below).
-      await settingsFacade.storeSourceConfigEndpointAccess({
-        configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms,
-        configId: activeOmsConfigId.value,
-        enabledSystemEnumIds: form.enabledEndpoints,
-      })
-    }
-
-    success.value = response.messages?.[0] ?? 'Saved HotWax source config.'
-    if (isEditing.value) {
-      await router.push(buildOmsSourceDashboardRoute(activeOmsConfigId.value))
-      return
-    }
-    await router.push('/settings/hotwax')
-  } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'The HotWax source config slipped off the shelf. Not saved.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function cancelEdit(): Promise<void> {
-  if (!isEditing.value || loading.value) return
-  await router.push(buildOmsSourceDashboardRoute(activeOmsConfigId.value))
-}
-
-watch(() => route.fullPath, () => {
-  void load()
-}, { immediate: true })
 </script>

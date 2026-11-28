@@ -1,27 +1,12 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="SFTP server setup progress" center-stage :edit-surface="isEditing">
+  <WorkflowPage v-bind="pageBindings" aria-label="SFTP server setup progress">
     <InlineValidation v-if="error" tone="error" :message="error" />
     <p v-if="success" class="success-copy">{{ success }}</p>
 
     <WorkflowStepForm
-      :class="[
-        'workflow-form--compact',
-        {
-          'workflow-form--edit-single-page': isEditing,
-        },
-      ]"
-      :question="currentQuestion"
-      :primary-label="primaryLabel"
-      :primary-action-variant="primaryActionVariant"
-      :show-enter-hint="!isEditing"
-      :show-back="showBack"
-      :show-cancel-action="isEditing"
+      v-bind="formBindings"
       :allow-select-enter="isCreateSelectStep"
-      :cancel-disabled="loading"
       cancel-test-id="cancel-sftp-server"
-      :submit-disabled="submitDisabled"
-      :show-primary-action="canManageConnections"
-      :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
       @cancel="cancelEdit"
@@ -111,7 +96,7 @@
         <div class="wizard-input-shell" data-testid="sftp-host-key">
           <span class="workflow-context-label">Server key</span>
           <span class="mono-copy">{{ savedHostKey || 'Saved on first connection' }}</span>
-          <label v-if="savedHostKey" class="sftp-forget-host-key">
+          <label v-if="savedHostKey">
             <input v-model="forgetHostKey" type="checkbox" data-testid="sftp-forget-host-key" />
             <span>Forget saved key</span>
           </label>
@@ -199,34 +184,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
 import type { SftpServerRecord } from '../../lib/api/types'
-import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useConnectionWorkflow, type ConnectionSaveOutcome } from './useConnectionWorkflow'
+import { findTenantRecord } from './useSettingsPagedList'
 
-type SftpCreateStepId =
-  | 'host'
-  | 'port'
-  | 'username'
-  | 'remoteAttributes'
-  | 'password'
-  | 'privateKey'
-  | 'description'
+type SftpCreateStepId = 'host' | 'port' | 'username' | 'remoteAttributes' | 'password' | 'privateKey' | 'description'
 
 interface SftpCreateStep {
   id: SftpCreateStepId
   title: string
-  kind: 'text' | 'number' | 'select' | 'password' | 'textarea'
 }
 
 interface SftpForm {
@@ -238,11 +212,6 @@ interface SftpForm {
   privateKey: string
   remoteAttributes: string
 }
-
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
 
 function createDefaultSftpForm(): SftpForm {
   return {
@@ -256,70 +225,61 @@ function createDefaultSftpForm(): SftpForm {
   }
 }
 
-const form = reactive<SftpForm>(createDefaultSftpForm())
-// DAR-BE-082: the server's key, saved on its first successful connection; later connections must present it.
-const savedHostKey = ref<string | null>(null)
-const forgetHostKey = ref(false)
-
-const loading = ref(false)
-const error = ref<string | null>(null)
-const success = ref<string | null>(null)
-const currentStepIndex = ref(0)
 const remoteAttributeOptions: AppSelectOption[] = [
   { value: 'Y', label: 'Yes' },
   { value: 'N', label: 'No' },
 ]
 const createSteps: SftpCreateStep[] = [
-  { id: 'host', title: 'What host should this SFTP server use?', kind: 'text' },
-  { id: 'port', title: 'What port should this SFTP server use?', kind: 'number' },
-  { id: 'username', title: 'What username should this SFTP server use?', kind: 'text' },
-  { id: 'remoteAttributes', title: 'Should this SFTP server use remote attributes?', kind: 'select' },
-  { id: 'password', title: 'What password should this SFTP server use?', kind: 'password' },
-  { id: 'privateKey', title: 'What private key should this SFTP server use?', kind: 'textarea' },
-  { id: 'description', title: 'What label should Darpan show for this server?', kind: 'text' },
+  { id: 'host', title: 'What host should this SFTP server use?' },
+  { id: 'port', title: 'What port should this SFTP server use?' },
+  { id: 'username', title: 'What username should this SFTP server use?' },
+  { id: 'remoteAttributes', title: 'Should this SFTP server use remote attributes?' },
+  { id: 'password', title: 'What password should this SFTP server use?' },
+  { id: 'privateKey', title: 'What private key should this SFTP server use?' },
+  { id: 'description', title: 'What label should Darpan show for this server?' },
 ]
 
-const activeServerId = computed(() => String(route.params.sftpServerId ?? '').trim())
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const isEditing = computed(() => activeServerId.value.length > 0)
-const {
-  currentCreateStep,
-  progressPercent,
-  currentQuestion,
-  primaryLabel,
-  primaryTestId,
-  primaryActionVariant,
-  showBack,
-  goNext,
-  goBack,
-} = useWorkflowStepMachine<SftpCreateStep>({
-  steps: createSteps,
-  currentStepIndex,
-  isEditing,
-  editQuestion: 'Update the SFTP server details.',
-  finalStepId: 'description',
-  saveTestId: 'save-sftp-server',
-  error,
-})
-const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
-const submitDisabled = computed(() => {
-  if (!canManageConnections.value) return true
-  if (loading.value) return true
-  if (isEditing.value) return false
+const route = useRoute()
+const form = reactive<SftpForm>(createDefaultSftpForm())
+// DAR-BE-082: the server's key, saved on its first successful connection; later connections must present it.
+const savedHostKey = ref<string | null>(null)
+const forgetHostKey = ref(false)
 
-  switch (currentCreateStep.value.id) {
-    case 'host':
-      return form.host.trim().length === 0
-    case 'port':
-      return !Number.isFinite(form.port) || form.port < 1
-    case 'username':
-      return form.username.trim().length === 0
-    case 'description':
-      return form.description.trim().length === 0
-    default:
-      return false
-  }
+const {
+  isEditing,
+  error,
+  success,
+  pageBindings,
+  formBindings,
+  currentCreateStep,
+  goBack,
+  handlePrimarySubmit,
+  cancelEdit,
+} = useConnectionWorkflow<SftpCreateStep>({
+  configId: () => String(route.params.sftpServerId ?? '').trim(),
+  steps: createSteps,
+  editQuestion: 'Update the SFTP server details.',
+  saveTestId: 'save-sftp-server',
+  stepBlocked: (step) => {
+    if (step.id === 'port') return !Number.isFinite(form.port) || form.port < 1
+    if (step.id === 'host' || step.id === 'username' || step.id === 'description') return form[step.id].trim().length === 0
+    return false
+  },
+  resetCreate: () => Object.assign(form, createDefaultSftpForm()),
+  load: async (sftpServerId, signal) => {
+    if (!sftpServerId) return
+    const response = await settingsFacade.listSftpServers({ pageIndex: 0, pageSize: 200 }, signal)
+    const record = findTenantRecord(response.servers, (server) => server.sftpServerId === sftpServerId)
+    if (!record) return `SFTP server "${sftpServerId}" logged off for the day.`
+    applyRecord(record)
+  },
+  loadFailedMessage: 'This server is not serving today.',
+  permissionMessage: 'You do not have permission to save SFTP servers for the active tenant.',
+  save,
+  saveFailedMessage: 'The server would not take your order. Not saved.',
+  cancelRoute: () => '/settings/sftp',
 })
+const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.id === 'remoteAttributes')
 
 function applyRecord(record: SftpServerRecord): void {
   form.description = record.description ?? ''
@@ -333,106 +293,20 @@ function applyRecord(record: SftpServerRecord): void {
   forgetHostKey.value = false
 }
 
-function resetCreateForm(): void {
-  Object.assign(form, createDefaultSftpForm())
-  currentStepIndex.value = 0
-  error.value = null
-  success.value = null
+async function save(): Promise<ConnectionSaveOutcome> {
+  const response = await settingsFacade.saveSftpServer({
+    ...(isEditing.value ? { sftpServerId: String(route.params.sftpServerId ?? '').trim() } : {}),
+    description: form.description,
+    host: form.host,
+    port: form.port,
+    username: form.username,
+    password: form.password,
+    privateKey: form.privateKey,
+    remoteAttributes: form.remoteAttributes,
+    ...(isEditing.value && forgetHostKey.value ? { resetHostKey: true } : {}),
+  })
+  form.password = ''
+  form.privateKey = ''
+  return { to: '/settings/sftp', message: response.messages?.[0] ?? 'Saved SFTP server.' }
 }
-
-const pageAbortController = new AbortController()
-let loadServerController: AbortController | null = null
-
-onBeforeUnmount(() => {
-  pageAbortController.abort()
-  loadServerController?.abort()
-})
-
-async function loadServer(): Promise<void> {
-  if (!isEditing.value) return
-
-  loadServerController?.abort()
-  loadServerController = new AbortController()
-  const signal = loadServerController.signal
-
-  loading.value = true
-  error.value = null
-  try {
-    const response = await settingsFacade.listSftpServers({ pageIndex: 0, pageSize: 200 }, signal)
-    const matchingServer = filterRecordsForActiveTenant(
-      response.servers ?? [],
-      authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-    ).find((server) => server.sftpServerId === activeServerId.value)
-    if (!matchingServer) {
-      error.value = `SFTP server "${activeServerId.value}" logged off for the day.`
-      return
-    }
-    applyRecord(matchingServer)
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'This server is not serving today.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'description') {
-    await save()
-    return
-  }
-
-  goNext()
-}
-
-async function save(): Promise<void> {
-  if (!canManageConnections.value) {
-    error.value = 'You do not have permission to save SFTP servers for the active tenant.'
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  success.value = null
-  try {
-    const response = await settingsFacade.saveSftpServer({
-      ...(isEditing.value ? { sftpServerId: activeServerId.value } : {}),
-      description: form.description,
-      host: form.host,
-      port: form.port,
-      username: form.username,
-      password: form.password,
-      privateKey: form.privateKey,
-      remoteAttributes: form.remoteAttributes,
-      ...(isEditing.value && forgetHostKey.value ? { resetHostKey: true } : {}),
-    })
-    form.password = ''
-    form.privateKey = ''
-    success.value = response.messages?.[0] ?? 'Saved SFTP server.'
-    await router.push('/settings/sftp')
-  } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'The server would not take your order. Not saved.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function cancelEdit(): Promise<void> {
-  if (!isEditing.value || loading.value) return
-  await router.push('/settings/sftp')
-}
-
-async function initializeForRoute(): Promise<void> {
-  if (!isEditing.value) {
-    resetCreateForm()
-    loading.value = false
-    return
-  }
-
-  await loadServer()
-}
-
-watch(() => route.fullPath, () => {
-  void initializeForRoute()
-}, { immediate: true })
 </script>

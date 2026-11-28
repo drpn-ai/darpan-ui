@@ -1,27 +1,12 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="NetSuite auth setup progress" center-stage :edit-surface="isEditing">
+  <WorkflowPage v-bind="pageBindings" aria-label="NetSuite auth setup progress">
     <InlineValidation v-if="error" tone="error" :message="error" />
     <p v-if="success" class="success-copy">{{ success }}</p>
 
     <WorkflowStepForm
-      :class="[
-        'workflow-form--compact',
-        {
-          'workflow-form--edit-single-page': isEditing,
-        },
-      ]"
-      :question="currentQuestion"
-      :primary-label="primaryLabel"
-      :primary-action-variant="primaryActionVariant"
-      :show-enter-hint="!isEditing"
-      :show-back="showBack"
-      :show-cancel-action="isEditing"
-      :cancel-disabled="loading"
-      cancel-test-id="cancel-netsuite-auth"
+      v-bind="formBindings"
       :allow-select-enter="isCreateSelectStep"
-      :submit-disabled="submitDisabled"
-      :show-primary-action="canManageConnections"
-      :primary-test-id="primaryTestId"
+      cancel-test-id="cancel-netsuite-auth"
       @submit="handlePrimarySubmit"
       @back="goBack"
       @cancel="cancelEdit"
@@ -334,23 +319,20 @@
 
 <script setup lang="ts">
 import AppIcon from '../../components/ui/AppIcon.vue'
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
-import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import type { NsAuthConfigRecord } from '../../lib/api/types'
 import type { SaveNsAuthConfigPayload } from '../../lib/api/facadeTypes'
-import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useConnectionWorkflow, type ConnectionSaveOutcome } from './useConnectionWorkflow'
+import { findTenantRecord } from './useSettingsPagedList'
 
 type AuthType = 'NONE' | 'BASIC' | 'BEARER' | 'OAUTH2_M2M_JWT'
 type AuthCreateStepId =
@@ -386,15 +368,9 @@ interface NsAuthForm {
   tokenUrl: string
   clientId: string
   certId: string
-  scope: string
   privateKeyPem: string
   isActive: string
 }
-
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
 
 function createDefaultNsAuthForm(): NsAuthForm {
   return {
@@ -406,13 +382,10 @@ function createDefaultNsAuthForm(): NsAuthForm {
     tokenUrl: '',
     clientId: '',
     certId: '',
-    scope: 'restlets rest_webservices',
     privateKeyPem: '',
     isActive: 'Y',
   }
 }
-
-const form = reactive<NsAuthForm>(createDefaultNsAuthForm())
 
 const authTypeOptions: AppSelectOption[] = [
   { value: 'NONE', label: 'None' },
@@ -430,14 +403,9 @@ const defaultScopeOptions: ScopeOption[] = [
 ]
 const defaultScopeValue = defaultScopeOptions.map((option) => option.value).join(' ')
 
-const loading = ref(false)
-const error = ref<string | null>(null)
-const success = ref<string | null>(null)
-const currentStepIndex = ref(0)
-
+const route = useRoute()
 const activeAuthConfigId = computed(() => String(route.params.nsAuthConfigId ?? '').trim())
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const isEditing = computed(() => activeAuthConfigId.value.length > 0)
+const form = reactive<NsAuthForm>(createDefaultNsAuthForm())
 const selectedScopeValues = ref<string[]>(parseScopeValue(defaultScopeValue))
 const showClientId = ref(false)
 const isBasicAuth = computed(() => form.authType === 'BASIC')
@@ -452,103 +420,93 @@ const scopeOptions = computed<ScopeOption[]>(() => {
   return [...defaultScopeOptions, ...customOptions]
 })
 
-function buildCreateSteps(authType: AuthType): AuthCreateStep[] {
-  const steps: AuthCreateStep[] = [
-    { id: 'authType', title: 'How should this NetSuite auth profile authenticate?', kind: 'select' },
-    { id: 'isActive', title: 'Should this auth profile be active?', kind: 'select' },
-  ]
+const createSteps = computed<AuthCreateStep[]>(() => [
+  { id: 'authType', title: 'How should this NetSuite auth profile authenticate?', kind: 'select' },
+  { id: 'isActive', title: 'Should this auth profile be active?', kind: 'select' },
+  ...(isBasicAuth.value
+    ? [
+      { id: 'username', title: 'What username should this auth profile use?', kind: 'text' } as const,
+      { id: 'password', title: 'What password should this auth profile use?', kind: 'password' } as const,
+    ]
+    : []),
+  ...(isBearerAuth.value ? [{ id: 'apiToken', title: 'What API token should this auth profile use?', kind: 'password' } as const] : []),
+  ...(isOauthAuth.value
+    ? [
+      { id: 'tokenUrl', title: 'What token URL should this auth profile use?', kind: 'text' } as const,
+      { id: 'clientId', title: 'What client ID should this auth profile use?', kind: 'text' } as const,
+      { id: 'certId', title: 'What cert ID should this auth profile use?', kind: 'text' } as const,
+      { id: 'scope', title: 'Which scopes should this auth profile request?', kind: 'multi-select' } as const,
+      { id: 'privateKeyPem', title: 'What private key PEM should this auth profile use?', kind: 'textarea' } as const,
+    ]
+    : []),
+  { id: 'description', title: 'What label should Darpan show for this auth profile?', kind: 'text' },
+])
 
-  if (authType === 'BASIC') {
-    steps.push(
-      { id: 'username', title: 'What username should this auth profile use?', kind: 'text' },
-      { id: 'password', title: 'What password should this auth profile use?', kind: 'password' },
-    )
-  }
-
-  if (authType === 'BEARER') {
-    steps.push({ id: 'apiToken', title: 'What API token should this auth profile use?', kind: 'password' })
-  }
-
-  if (authType === 'OAUTH2_M2M_JWT') {
-    steps.push(
-      { id: 'tokenUrl', title: 'What token URL should this auth profile use?', kind: 'text' },
-      { id: 'clientId', title: 'What client ID should this auth profile use?', kind: 'text' },
-      { id: 'certId', title: 'What cert ID should this auth profile use?', kind: 'text' },
-      { id: 'scope', title: 'Which scopes should this auth profile request?', kind: 'multi-select' },
-      { id: 'privateKeyPem', title: 'What private key PEM should this auth profile use?', kind: 'textarea' },
-    )
-  }
-
-  steps.push({ id: 'description', title: 'What label should Darpan show for this auth profile?', kind: 'text' })
-
-  return steps
+function authDashboardRoute(nsAuthConfigId: string) {
+  return { name: 'settings-netsuite-auth', params: { nsAuthConfigId } }
 }
 
-const createSteps = computed<AuthCreateStep[]>(() => buildCreateSteps(form.authType))
 const {
-  currentCreateStep,
-  progressPercent,
-  currentQuestion,
-  primaryLabel,
-  primaryTestId,
-  primaryActionVariant,
-  showBack,
-  goNext,
-  goBack,
-} = useWorkflowStepMachine<AuthCreateStep>({
-  steps: createSteps,
-  currentStepIndex,
   isEditing,
-  editQuestion: 'Update the NetSuite auth profile.',
-  finalStepId: 'description',
-  saveTestId: 'save-netsuite-auth',
   error,
+  success,
+  pageBindings,
+  formBindings,
+  currentCreateStep,
+  goBack,
+  handlePrimarySubmit,
+  cancelEdit,
+} = useConnectionWorkflow<AuthCreateStep>({
+  configId: () => activeAuthConfigId.value,
+  steps: createSteps,
+  editQuestion: 'Update the NetSuite auth profile.',
+  saveTestId: 'save-netsuite-auth',
+  stepBlocked: (step) => {
+    switch (step.id) {
+      case 'username':
+      case 'tokenUrl':
+      case 'clientId':
+      case 'certId':
+      case 'privateKeyPem':
+      case 'description':
+        return form[step.id].trim().length === 0
+      // A secret is taken as typed, spaces and all.
+      case 'password':
+      case 'apiToken':
+        return form[step.id].length === 0
+      case 'scope':
+        return selectedScopeValues.value.length === 0
+      default:
+        return false
+    }
+  },
+  resetCreate: () => {
+    Object.assign(form, createDefaultNsAuthForm())
+    selectedScopeValues.value = parseScopeValue(defaultScopeValue)
+    showClientId.value = false
+  },
+  load: async (nsAuthConfigId, signal) => {
+    if (!nsAuthConfigId) return
+    const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 200 }, signal)
+    const record = findTenantRecord(response.authConfigs, (config) => config.nsAuthConfigId === nsAuthConfigId)
+    if (!record) return `NetSuite auth config "${nsAuthConfigId}" is hiding in a saved search.`
+    applyRecord(record)
+  },
+  loadFailedMessage: 'This auth config is having an identity crisis.',
+  permissionMessage: 'You do not have permission to save NetSuite auth settings for the active tenant.',
+  save,
+  saveFailedMessage: 'The auth config wrote it in disappearing ink. Not saved.',
+  cancelRoute: () => authDashboardRoute(activeAuthConfigId.value),
 })
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
-const submitDisabled = computed(() => {
-  if (!canManageConnections.value) return true
-  if (loading.value) return true
-  if (isEditing.value) return false
-
-  switch (currentCreateStep.value.id) {
-    case 'username':
-      return form.username.trim().length === 0
-    case 'password':
-      return form.password.length === 0
-    case 'apiToken':
-      return form.apiToken.length === 0
-    case 'tokenUrl':
-      return form.tokenUrl.trim().length === 0
-    case 'clientId':
-      return form.clientId.trim().length === 0
-    case 'certId':
-      return form.certId.trim().length === 0
-    case 'scope':
-      return selectedScopeValues.value.length === 0
-    case 'privateKeyPem':
-      return form.privateKeyPem.trim().length === 0
-    case 'description':
-      return form.description.trim().length === 0
-    default:
-      return false
-  }
-})
 
 function normalizeAuthType(raw: unknown): AuthType {
   const value = String(raw ?? '').toUpperCase()
-  if (value === 'BASIC') return 'BASIC'
-  if (value === 'BEARER') return 'BEARER'
-  if (value === 'OAUTH2_M2M_JWT') return 'OAUTH2_M2M_JWT'
-  return 'NONE'
+  return value === 'BASIC' || value === 'BEARER' || value === 'OAUTH2_M2M_JWT' ? value : 'NONE'
 }
 
 function parseScopeValue(raw: string | null | undefined): string[] {
-  return Array.from(new Set(
-    String(raw ?? '')
-      .split(/\s+/)
-      .map((token) => token.trim())
-      .filter(Boolean),
-  ))
+  return Array.from(new Set(String(raw ?? '').split(/\s+/).map((token) => token.trim()).filter(Boolean)))
 }
 
 function serializeSelectedScopes(): string {
@@ -558,21 +516,12 @@ function serializeSelectedScopes(): string {
     .join(' ')
 }
 
-function applyScopeValue(raw: string | null | undefined): void {
-  selectedScopeValues.value = parseScopeValue(raw && raw.trim().length > 0 ? raw : defaultScopeValue)
-  form.scope = serializeSelectedScopes()
-}
-
 function clearAuthInputsForMode(authType: AuthType): void {
   if (authType !== 'BASIC') {
     form.username = ''
     form.password = ''
   }
-
-  if (authType !== 'BEARER') {
-    form.apiToken = ''
-  }
-
+  if (authType !== 'BEARER') form.apiToken = ''
   if (authType !== 'OAUTH2_M2M_JWT') {
     form.tokenUrl = ''
     form.clientId = ''
@@ -591,180 +540,41 @@ function applyRecord(record: NsAuthConfigRecord): void {
   form.tokenUrl = record.tokenUrl ?? ''
   form.clientId = record.clientId ?? ''
   form.certId = record.certId ?? ''
-  applyScopeValue(record.scope ?? defaultScopeValue)
+  selectedScopeValues.value = parseScopeValue(record.scope?.trim() ? record.scope : defaultScopeValue)
   form.privateKeyPem = ''
   form.isActive = record.isActive ?? 'Y'
 }
 
-function resetCreateForm(): void {
-  Object.assign(form, createDefaultNsAuthForm())
-  selectedScopeValues.value = parseScopeValue(defaultScopeValue)
-  form.scope = defaultScopeValue
-  showClientId.value = false
-  currentStepIndex.value = 0
-  error.value = null
-  success.value = null
-}
-
-function buildPayloadForAuthType(): SaveNsAuthConfigPayload {
-  const basePayload = {
+/** Every field is sent; the ones the auth type does not use go blank, so a profile never keeps a stale secret. */
+function buildPayload(): SaveNsAuthConfigPayload {
+  const basic = isBasicAuth.value
+  const oauth = isOauthAuth.value
+  return {
     ...(isEditing.value ? { nsAuthConfigId: activeAuthConfigId.value } : {}),
     description: form.description.trim(),
     authType: form.authType,
     isActive: form.isActive,
+    username: basic ? form.username.trim() : '',
+    password: basic ? form.password : '',
+    apiToken: isBearerAuth.value ? form.apiToken : '',
+    tokenUrl: oauth ? form.tokenUrl.trim() : '',
+    clientId: oauth ? form.clientId.trim() : '',
+    certId: oauth ? form.certId.trim() : '',
+    scope: oauth ? serializeSelectedScopes() : '',
+    privateKeyPem: oauth ? form.privateKeyPem : '',
   }
+}
 
-  if (isBasicAuth.value) {
-    return {
-      ...basePayload,
-      username: form.username.trim(),
-      password: form.password,
-      apiToken: '',
-      tokenUrl: '',
-      clientId: '',
-      certId: '',
-      scope: '',
-      privateKeyPem: '',
-    }
-  }
-
-  if (isBearerAuth.value) {
-    return {
-      ...basePayload,
-      username: '',
-      password: '',
-      apiToken: form.apiToken,
-      tokenUrl: '',
-      clientId: '',
-      certId: '',
-      scope: '',
-      privateKeyPem: '',
-    }
-  }
-
-  if (isOauthAuth.value) {
-    return {
-      ...basePayload,
-      username: '',
-      password: '',
-      apiToken: '',
-      tokenUrl: form.tokenUrl.trim(),
-      clientId: form.clientId.trim(),
-      certId: form.certId.trim(),
-      scope: serializeSelectedScopes(),
-      privateKeyPem: form.privateKeyPem,
-    }
-  }
-
+async function save(): Promise<ConnectionSaveOutcome> {
+  const response = await settingsFacade.saveNsAuthConfig(buildPayload())
+  form.password = ''
+  form.apiToken = ''
+  form.privateKeyPem = ''
   return {
-    ...basePayload,
-    username: '',
-    password: '',
-    apiToken: '',
-    tokenUrl: '',
-    clientId: '',
-    certId: '',
-    scope: '',
-    privateKeyPem: '',
+    to: isEditing.value ? authDashboardRoute(activeAuthConfigId.value) : '/settings/netsuite',
+    message: response.messages?.[0] ?? 'Saved auth config.',
   }
 }
-
-async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'description') {
-    await save()
-    return
-  }
-
-  goNext()
-}
-
-const pageAbortController = new AbortController()
-let loadAuthConfigController: AbortController | null = null
-
-onBeforeUnmount(() => {
-  pageAbortController.abort()
-  loadAuthConfigController?.abort()
-})
-
-async function loadAuthConfig(): Promise<void> {
-  if (!isEditing.value) return
-
-  loadAuthConfigController?.abort()
-  loadAuthConfigController = new AbortController()
-  const signal = loadAuthConfigController.signal
-
-  loading.value = true
-  error.value = null
-  try {
-    const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 200 }, signal)
-    const matchingConfig = filterRecordsForActiveTenant(
-      response.authConfigs ?? [],
-      authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-    ).find((config) => config.nsAuthConfigId === activeAuthConfigId.value)
-    if (!matchingConfig) {
-      error.value = `NetSuite auth config "${activeAuthConfigId.value}" is hiding in a saved search.`
-      return
-    }
-    applyRecord(matchingConfig)
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'This auth config is having an identity crisis.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function initializeForRoute(): Promise<void> {
-
-  if (!isEditing.value) {
-    resetCreateForm()
-    loading.value = false
-    return
-  }
-
-  await loadAuthConfig()
-}
-
-async function save(): Promise<void> {
-  if (!canManageConnections.value) {
-    error.value = 'You do not have permission to save NetSuite auth settings for the active tenant.'
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  success.value = null
-
-  try {
-    const response = await settingsFacade.saveNsAuthConfig(buildPayloadForAuthType())
-    form.password = ''
-    form.apiToken = ''
-    form.privateKeyPem = ''
-    success.value = response.messages?.[0] ?? 'Saved auth config.'
-    await router.push(isEditing.value ? authDashboardRoute(activeAuthConfigId.value) : '/settings/netsuite')
-  } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'The auth config wrote it in disappearing ink. Not saved.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function cancelEdit(): Promise<void> {
-  if (!isEditing.value || loading.value) return
-  await router.push(authDashboardRoute(activeAuthConfigId.value))
-}
-
-function authDashboardRoute(nsAuthConfigId: string) {
-  return { name: 'settings-netsuite-auth', params: { nsAuthConfigId } }
-}
-
-watch(
-  selectedScopeValues,
-  () => {
-    form.scope = serializeSelectedScopes()
-  },
-  { deep: true },
-)
 
 watch(
   () => form.authType,
@@ -773,10 +583,6 @@ watch(
     clearAuthInputsForMode(authType)
   },
 )
-
-watch(() => route.fullPath, () => {
-  void initializeForRoute()
-}, { immediate: true })
 </script>
 
 <style scoped>

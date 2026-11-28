@@ -457,7 +457,8 @@ describe('NetSuiteEndpointWorkflowPage', () => {
 
     expect(workflowForm.classes()).toContain('workflow-form--compact')
     expect(workflowForm.classes()).toContain('workflow-form--edit-single-page')
-    expect(pageSource).toContain("'workflow-form--edit-single-page': isEditing")
+    expect(pageSource).toContain('v-bind="formBindings"')
+    expect(readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')).toContain("'workflow-form--edit-single-page': isEditing.value")
     expect(source).toContain('.workflow-form--edit-single-page {')
     expect(source).toContain('--workflow-form-answer-size: clamp(0.89rem, 1.05vw, 1.09rem);')
   })

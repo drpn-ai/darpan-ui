@@ -1,27 +1,12 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="NetSuite endpoint setup progress" center-stage :edit-surface="isEditing">
+  <WorkflowPage v-bind="pageBindings" aria-label="NetSuite endpoint setup progress">
     <InlineValidation v-if="error" tone="error" :message="error" />
     <p v-if="success" class="success-copy">{{ success }}</p>
 
     <WorkflowStepForm
-      :class="[
-        'workflow-form--compact',
-        {
-          'workflow-form--edit-single-page': isEditing,
-        },
-      ]"
-      :question="currentQuestion"
-      :primary-label="primaryLabel"
-      :primary-action-variant="primaryActionVariant"
-      :show-enter-hint="!isEditing"
-      :show-back="showBack"
-      :show-cancel-action="isEditing"
-      :cancel-disabled="loading"
-      cancel-test-id="cancel-netsuite-endpoint"
+      v-bind="formBindings"
       :allow-select-enter="isCreateSelectStep"
-      :submit-disabled="submitDisabled"
-      :show-primary-action="canManageConnections"
-      :primary-test-id="primaryTestId"
+      cancel-test-id="cancel-netsuite-endpoint"
       @submit="handlePrimarySubmit"
       @back="goBack"
       @cancel="cancelEdit"
@@ -202,23 +187,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
-import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
 import type { NsRestletConfigRecord } from '../../lib/api/types'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useAuthStore } from '../../stores/auth'
+import { useConnectionWorkflow, type ConnectionSaveOutcome } from './useConnectionWorkflow'
+import { findTenantRecord } from './useSettingsPagedList'
 
 type EndpointCreateStepId =
   | 'endpointUrl'
@@ -247,11 +231,6 @@ interface EndpointForm {
   isActive: string
 }
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
-
 function createDefaultEndpointForm(): EndpointForm {
   return {
     description: '',
@@ -265,8 +244,6 @@ function createDefaultEndpointForm(): EndpointForm {
   }
 }
 
-const form = reactive<EndpointForm>(createDefaultEndpointForm())
-
 const httpMethodOptions: AppSelectOption[] = [
   { value: 'POST', label: 'POST' },
   { value: 'PUT', label: 'PUT' },
@@ -276,17 +253,6 @@ const yesNoOptions: AppSelectOption[] = [
   { value: 'Y', label: 'Yes' },
   { value: 'N', label: 'No' },
 ]
-
-const authOptions = ref<WorkflowSelectOption[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-const success = ref<string | null>(null)
-const currentStepIndex = ref(0)
-
-const activeEndpointConfigId = computed(() => String(route.params.nsRestletConfigId ?? '').trim())
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const isEditing = computed(() => activeEndpointConfigId.value.length > 0)
-
 const createSteps: EndpointCreateStep[] = [
   { id: 'endpointUrl', title: 'What URL should this NetSuite endpoint use?', kind: 'text' },
   { id: 'httpMethod', title: 'Which HTTP method should this endpoint use?', kind: 'select' },
@@ -298,44 +264,75 @@ const createSteps: EndpointCreateStep[] = [
   { id: 'description', title: 'What label should Darpan show for this endpoint?', kind: 'text' },
 ]
 
+const route = useRoute()
+const authStore = useAuthStore()
+const activeEndpointConfigId = computed(() => String(route.params.nsRestletConfigId ?? '').trim())
+const form = reactive<EndpointForm>(createDefaultEndpointForm())
+const authOptions = ref<WorkflowSelectOption[]>([])
+
+/** Endpoints are listed under their auth profile, so that is where saving or leaving lands. */
+function authDashboardRoute() {
+  const nsAuthConfigId = form.nsAuthConfigId.trim()
+  return nsAuthConfigId ? { name: 'settings-netsuite-auth', params: { nsAuthConfigId } } : '/settings/netsuite'
+}
+
 const {
-  currentCreateStep,
-  progressPercent,
-  currentQuestion,
-  primaryLabel,
-  primaryTestId,
-  primaryActionVariant,
-  showBack,
-  goNext,
-  goBack,
-} = useWorkflowStepMachine<EndpointCreateStep>({
-  steps: createSteps,
-  currentStepIndex,
   isEditing,
-  editQuestion: 'Update the NetSuite endpoint config.',
-  finalStepId: 'description',
-  saveTestId: 'save-netsuite-endpoint',
   error,
+  success,
+  pageBindings,
+  formBindings,
+  currentCreateStep,
+  goBack,
+  handlePrimarySubmit,
+  cancelEdit,
+} = useConnectionWorkflow<EndpointCreateStep>({
+  configId: () => activeEndpointConfigId.value,
+  steps: createSteps,
+  editQuestion: 'Update the NetSuite endpoint config.',
+  saveTestId: 'save-netsuite-endpoint',
+  stepBlocked: (step) => {
+    if (step.id === 'endpointUrl' || step.id === 'description') return form[step.id].trim().length === 0
+    if (step.id === 'connectTimeoutSeconds' || step.id === 'readTimeoutSeconds') {
+      return !Number.isFinite(form[step.id]) || form[step.id] < 1
+    }
+    return false
+  },
+  resetCreate: () => {
+    Object.assign(form, createDefaultEndpointForm())
+    // Opened from an auth profile's details page: that profile is the answer to the auth step.
+    form.nsAuthConfigId = String(route.query.nsAuthConfigId ?? '').trim()
+  },
+  load: async (nsRestletConfigId, signal) => {
+    const [missing] = await Promise.all([loadEndpointConfig(nsRestletConfigId, signal), loadAuthOptions(signal)])
+    return missing
+  },
+  loadFailedMessage: 'This endpoint config took a wrong turn somewhere.',
+  permissionMessage: 'You do not have permission to save NetSuite endpoint settings for the active tenant.',
+  save,
+  saveFailedMessage: 'The endpoint config took a wrong turn. Not saved.',
+  cancelRoute: authDashboardRoute,
 })
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
-const submitDisabled = computed(() => {
-  if (!canManageConnections.value) return true
-  if (loading.value) return true
-  if (isEditing.value) return false
 
-  switch (currentCreateStep.value.id) {
-    case 'endpointUrl':
-      return form.endpointUrl.trim().length === 0
-    case 'connectTimeoutSeconds':
-      return !Number.isFinite(form.connectTimeoutSeconds) || form.connectTimeoutSeconds < 1
-    case 'readTimeoutSeconds':
-      return !Number.isFinite(form.readTimeoutSeconds) || form.readTimeoutSeconds < 1
-    case 'description':
-      return form.description.trim().length === 0
-    default:
-      return false
-  }
-})
+async function loadAuthOptions(signal: AbortSignal): Promise<void> {
+  const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 200 }, signal)
+  authOptions.value = filterRecordsForActiveTenant(
+    response.authConfigs ?? [],
+    authStore.sessionInfo?.activeTenantUserGroupId ?? null,
+  ).map((item) => ({
+    value: item.nsAuthConfigId,
+    label: resolveRecordLabel({ description: item.description, primary: item.nsAuthConfigId, fallbackId: item.nsAuthConfigId }),
+  }))
+}
+
+async function loadEndpointConfig(nsRestletConfigId: string, signal: AbortSignal): Promise<string | void> {
+  if (!nsRestletConfigId) return
+  const response = await settingsFacade.listNsRestletConfigs({ pageIndex: 0, pageSize: 200 }, signal)
+  const record = findTenantRecord(response.restletConfigs, (config) => config.nsRestletConfigId === nsRestletConfigId)
+  if (!record) return `NetSuite endpoint config "${nsRestletConfigId}" took a wrong turn somewhere.`
+  applyRecord(record)
+}
 
 function applyRecord(record: NsRestletConfigRecord): void {
   form.description = record.description ?? ''
@@ -348,126 +345,18 @@ function applyRecord(record: NsRestletConfigRecord): void {
   form.isActive = record.isActive ?? 'Y'
 }
 
-function resetCreateForm(): void {
-  Object.assign(form, createDefaultEndpointForm())
-  // Opened from an auth profile's details page: that profile is the answer to the auth step.
-  form.nsAuthConfigId = String(route.query.nsAuthConfigId ?? '').trim()
-  currentStepIndex.value = 0
-  error.value = null
-  success.value = null
+async function save(): Promise<ConnectionSaveOutcome> {
+  const response = await settingsFacade.saveNsRestletConfig({
+    ...(isEditing.value ? { nsRestletConfigId: activeEndpointConfigId.value } : {}),
+    description: form.description.trim(),
+    endpointUrl: form.endpointUrl.trim(),
+    httpMethod: form.httpMethod,
+    nsAuthConfigId: form.nsAuthConfigId,
+    headersJson: form.headersJson.trim(),
+    connectTimeoutSeconds: form.connectTimeoutSeconds,
+    readTimeoutSeconds: form.readTimeoutSeconds,
+    isActive: form.isActive,
+  })
+  return { to: authDashboardRoute(), message: response.messages?.[0] ?? 'Saved endpoint config.' }
 }
-
-const pageAbortController = new AbortController()
-let loadController: AbortController | null = null
-
-onBeforeUnmount(() => {
-  pageAbortController.abort()
-  loadController?.abort()
-})
-
-async function loadAuthOptions(signal?: AbortSignal): Promise<void> {
-  const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 200 }, signal)
-  authOptions.value = filterRecordsForActiveTenant(
-    response.authConfigs ?? [],
-    authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  ).map((item) => ({
-    value: item.nsAuthConfigId,
-    label: resolveRecordLabel({
-      description: item.description,
-      primary: item.nsAuthConfigId,
-      fallbackId: item.nsAuthConfigId,
-    }),
-  }))
-}
-
-async function loadEndpointConfig(signal?: AbortSignal): Promise<void> {
-  if (!isEditing.value) return
-
-  const response = await settingsFacade.listNsRestletConfigs({ pageIndex: 0, pageSize: 200 }, signal)
-  const matchingConfig = filterRecordsForActiveTenant(
-    response.restletConfigs ?? [],
-    authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  ).find(
-    (config) => config.nsRestletConfigId === activeEndpointConfigId.value,
-  )
-  if (!matchingConfig) {
-    error.value = `NetSuite endpoint config "${activeEndpointConfigId.value}" took a wrong turn somewhere.`
-    return
-  }
-  applyRecord(matchingConfig)
-}
-
-async function load(): Promise<void> {
-  loading.value = true
-  error.value = null
-  success.value = null
-  if (!isEditing.value) resetCreateForm()
-
-  loadController?.abort()
-  loadController = new AbortController()
-  const signal = loadController.signal
-
-  try {
-    await Promise.all([loadAuthOptions(signal), loadEndpointConfig(signal)])
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'This endpoint config took a wrong turn somewhere.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'description') {
-    await save()
-    return
-  }
-
-  goNext()
-}
-
-async function save(): Promise<void> {
-  if (!canManageConnections.value) {
-    error.value = 'You do not have permission to save NetSuite endpoint settings for the active tenant.'
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  success.value = null
-  try {
-    const response = await settingsFacade.saveNsRestletConfig({
-      ...(isEditing.value ? { nsRestletConfigId: activeEndpointConfigId.value } : {}),
-      description: form.description.trim(),
-      endpointUrl: form.endpointUrl.trim(),
-      httpMethod: form.httpMethod,
-      nsAuthConfigId: form.nsAuthConfigId,
-      headersJson: form.headersJson.trim(),
-      connectTimeoutSeconds: form.connectTimeoutSeconds,
-      readTimeoutSeconds: form.readTimeoutSeconds,
-      isActive: form.isActive,
-    })
-    success.value = response.messages?.[0] ?? 'Saved endpoint config.'
-    await router.push(authDashboardRoute())
-  } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'The endpoint config took a wrong turn. Not saved.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function cancelEdit(): Promise<void> {
-  if (!isEditing.value || loading.value) return
-  await router.push(authDashboardRoute())
-}
-
-/** Endpoints are listed under their auth profile, so that is where saving or leaving lands. */
-function authDashboardRoute() {
-  const nsAuthConfigId = form.nsAuthConfigId.trim()
-  return nsAuthConfigId ? { name: 'settings-netsuite-auth', params: { nsAuthConfigId } } : '/settings/netsuite'
-}
-
-watch(() => route.fullPath, () => {
-  void load()
-}, { immediate: true })
 </script>
