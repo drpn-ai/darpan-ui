@@ -1,4 +1,4 @@
-// DAR-UI-064. Audit authoring calls, kept out of facade.ts so this slice stays separable from work in flight there.
+// DAR-UI-064. Authoring calls: NetSuite SuiteQL queries, a run's conclusions, and an audit's checks.
 import { callService } from './client'
 import type {
   AuditCheckDraft,
@@ -18,7 +18,7 @@ import type {
   SaveNsSuiteQlQueryResponse,
 } from './authoringTypes'
 
-export const NETSUITE_QUERY = {
+const NETSUITE_QUERY = {
   getOptions: 'facade.NetSuiteQueryFacadeServices.get#NsSuiteQlQueryOptions',
   get: 'facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery',
   save: 'facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery',
@@ -41,7 +41,7 @@ export const netSuiteQueryFacade = {
   },
 }
 
-export const RUN_CONCLUSION = {
+const RUN_CONCLUSION = {
   get: 'facade.RunConclusionFacadeServices.get#RunConclusions',
   save: 'facade.RunConclusionFacadeServices.save#RunConclusions',
   createCode: 'facade.RunConclusionFacadeServices.create#RunConclusionCode',
@@ -69,7 +69,7 @@ export const runConclusionFacade = {
   },
 }
 
-export const AUDIT_CHECK = {
+const AUDIT_CHECK = {
   getOptions: 'facade.AuditFacadeServices.get#AuditCheckOptions',
   save: 'facade.AuditFacadeServices.save#AuditCheck',
   remove: 'facade.AuditFacadeServices.remove#AuditCheck',

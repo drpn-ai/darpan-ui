@@ -13,9 +13,9 @@
 export const READ_CACHE_MAX_AGE_MS = 15 * 60_000
 export const READ_CACHE_MAX_ENTRIES = 50
 /** A prefetch leaves alone a key it fetched this recently: hovering the same link twice asks once. */
-export const PREFETCH_FRESH_MS = 30_000
+const PREFETCH_FRESH_MS = 30_000
 /** readQueryOnce trusts a copy this recent outright: long enough to cover a prefetch and the click after it. */
-export const READ_ONCE_FRESH_MS = 60_000
+const READ_ONCE_FRESH_MS = 60_000
 
 /** A read any caller can name and run: a page, a prefetch, or both racing for the same key. */
 export interface ReadQuery<T> {
