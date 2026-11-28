@@ -1,6 +1,7 @@
 // DAR-BE-159 / DAR-BE-223. The embedded agent's panel (facade.AgentTurnFacadeServices, in the darpan-agent component)
 // and the drafted changes it proposes (facade.AgentChangeFacadeServices). The tenant is always the session's active
 // tenant; no call names one. A draft changes nothing until a person who may save the audit's checks plans and applies it.
+import type { Schemas } from './generated'
 
 /** Whether the agent can run for the person now. */
 export type AgentState = 'ON' | 'AGENT_OFF' | 'AGENT_UNAVAILABLE' | 'AGENT_REFUSED'
@@ -65,19 +66,7 @@ export interface GetAgentStatusResponse {
   canApprove: boolean
 }
 
-export interface SendAgentTurnPayload {
-  /** Continue this conversation; leave it out to start one. */
-  conversationId?: string
-  /** The audit's row id; or name it by auditCode. Exactly one of the two. */
-  auditId?: string
-  /** The audit's code (the report's audit id, e.g. month-close), looked up in the active tenant. */
-  auditCode?: string
-  /** The finding the panel is open on. */
-  findingId?: string
-  /** DAR-BE-252. The statement code (e.g. R2) the panel is open on: the agent sees it and a sample of its Unexplained findings. */
-  statement?: string
-  text: string
-}
+export type SendAgentTurnPayload = Schemas['SendAgentTurnParams']
 
 export interface SendAgentTurnResponse {
   conversationId: string

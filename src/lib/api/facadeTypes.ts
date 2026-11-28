@@ -9,73 +9,35 @@ import type { SourceExtractOptions } from './authoringTypes'
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
-export interface SaveUserSettingsPayload {
-  displayName?: string
-  timeZone?: string
-}
+export type SaveUserSettingsPayload = Schemas['SaveUserSettingsParams']
 
-export interface VerifyOwnPasswordPayload {
-  currentPassword: string
-}
+export type VerifyOwnPasswordPayload = Schemas['VerifyOwnPasswordParams']
 
-export interface ChangeOwnPasswordPayload {
-  currentPassword: string
-  newPassword: string
-  newPasswordVerify: string
-}
+export type ChangeOwnPasswordPayload = Schemas['ChangeOwnPasswordParams']
 
 /** Carries `username` because there is no session to infer it from — this runs before sign-in, for an
  *  account that login refuses until its password changes. */
-export interface ChangeExpiredPasswordPayload {
-  username: string
-  currentPassword: string
-  newPassword: string
-  newPasswordVerify: string
-}
+export type ChangeExpiredPasswordPayload = Schemas['ChangeExpiredPasswordParams']
 
 /** DAR-BE-028 forgot password; all three run before sign-in, so they carry who is asking. */
-export interface RequestPasswordResetPayload {
-  usernameOrEmail: string
-}
+export type RequestPasswordResetPayload = Schemas['RequestPasswordResetParams']
 
-export interface VerifyPasswordResetCodePayload {
-  usernameOrEmail: string
-  code: string
-}
+export type VerifyPasswordResetCodePayload = Schemas['VerifyPasswordResetCodeParams']
 
-export interface CompletePasswordResetPayload {
-  usernameOrEmail: string
-  code: string
-  newPassword: string
-  newPasswordVerify: string
-}
+export type CompletePasswordResetPayload = Schemas['CompletePasswordResetParams']
 
 /** The backend checks currentPassword itself: a session token alone cannot redirect reset codes. */
-export interface SaveRecoveryEmailPayload {
-  emailAddress: string
-  currentPassword: string
-}
+export type SaveRecoveryEmailPayload = Schemas['SaveRecoveryEmailParams']
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
-export interface SaveTenantSettingsPayload {
-  timeZone?: string
-  /** Absent leaves it unchanged; '' clears it. */
-  streaksChatSpaceId?: string
-}
+export type SaveTenantSettingsPayload = Schemas['SaveTenantSettingsParams']
 
-export interface ListSlackChannelsPayload {
-  slackInstallId: string
-  cursor?: string
-}
+export type ListSlackChannelsPayload = Schemas['ListSlackChannelsParams']
 
-export interface SaveSlackBotTokenPayload {
-  botAccessToken: string
-}
+export type SaveSlackBotTokenPayload = Schemas['SaveSlackBotTokenParams']
 
-export interface DisconnectSlackWorkspacePayload {
-  slackInstallId: string
-}
+export type DisconnectSlackWorkspacePayload = Schemas['DisconnectSlackWorkspaceParams']
 
 export interface SaveTenantChatSpacePayload {
   chatSpaceId?: string
@@ -90,13 +52,9 @@ export interface SaveTenantChatSpacePayload {
   isActive?: boolean
 }
 
-export interface DeleteTenantChatSpacePayload {
-  chatSpaceId: string
-}
+export type DeleteTenantChatSpacePayload = Schemas['DeleteTenantChatSpaceParams']
 
-export interface SaveUserNotificationDefaultPayload {
-  chatSpaceId?: string
-}
+export type SaveUserNotificationDefaultPayload = Schemas['SaveUserNotificationDefaultParams']
 
 /**
  * DAR-UI-123. Moves one source to a space. A blank chatSpaceId posts nowhere (refused for SCRIPT); an AUDIT_UPDATE move
@@ -109,9 +67,7 @@ export interface SetNotificationRoutePayload {
   chatSpaceId?: string | null
 }
 
-export interface SendChatSpaceTestPayload {
-  chatSpaceId: string
-}
+export type SendChatSpaceTestPayload = Schemas['SendChatSpaceTestParams']
 
 export interface ListSftpServersPayload {
   pageIndex: number
@@ -173,9 +129,7 @@ export interface ListShopifyAuthConfigsPayload {
   pageSize: number
 }
 
-export interface GetShopifyAuthConfigPayload {
-  shopifyAuthConfigId: string
-}
+export type GetShopifyAuthConfigPayload = Schemas['GetShopifyAuthConfigParams']
 
 export interface SaveShopifyAuthConfigPayload {
   shopifyAuthConfigId?: string
@@ -188,22 +142,11 @@ export interface SaveShopifyAuthConfigPayload {
   canReadOrders?: boolean
 }
 
-export interface DeleteShopifyAuthConfigPayload {
-  shopifyAuthConfigId: string
-}
+export type DeleteShopifyAuthConfigPayload = Schemas['DeleteShopifyAuthConfigParams']
 
-export interface DeleteNsAuthConfigPayload {
-  nsAuthConfigId: string
-}
+export type DeleteNsAuthConfigPayload = Schemas['DeleteNsAuthConfigParams']
 
-export interface TestSourceConnectionPayload {
-  systemEnumId: string
-  configId: string
-  /** Run only this stage, as reported by a previous call's nextStage. */
-  stage?: string
-  /** Start a staged run: with no stage, runs only the connector's first stage. */
-  staged?: boolean
-}
+export type TestSourceConnectionPayload = Schemas['TestSourceConnectionParams']
 
 export interface ListOmsRestSourceConfigsPayload {
   pageIndex: number
@@ -256,17 +199,9 @@ export interface StoreSourceConfigEndpointAccessPayload {
 
 // ─── JSON Schema ─────────────────────────────────────────────────────────────
 
-export interface ListJsonSchemasPayload {
-  pageIndex?: number
-  pageSize?: number
-  query?: string
-  systemEnumId?: string
-}
+export type ListJsonSchemasPayload = Schemas['ListJsonSchemasParams']
 
-export interface GetJsonSchemaPayload {
-  jsonSchemaId?: string
-  schemaName?: string
-}
+export type GetJsonSchemaPayload = Schemas['GetJsonSchemaParams']
 
 export interface SaveJsonSchemaTextPayload {
   schemaName: string
@@ -275,17 +210,11 @@ export interface SaveJsonSchemaTextPayload {
   overwrite?: boolean
 }
 
-export interface InferJsonSchemaFromTextPayload {
-  jsonText: string
-}
+export type InferJsonSchemaFromTextPayload = Schemas['InferJsonSchemaFromTextParams']
 
-export interface InferJsonSchemaFromCsvTextPayload {
-  // Head slice of the upload, not necessarily the whole file.
-  csvText: string
-  // Whether csvText is the entire file. A truncated header and a complete header-only file with
-  // no trailing newline are byte-identical; this is the only thing that separates them.
-  isCompleteFile: boolean
-}
+/** csvText is the head of the upload. isCompleteFile says whether it is the whole file: a truncated header and a complete
+ *  header-only file with no trailing newline are byte-identical, and this is the only thing that separates them. */
+export type InferJsonSchemaFromCsvTextPayload = Schemas['InferJsonSchemaFromCsvTextParams']
 
 export interface FlattenJsonSchemaPayload {
   jsonSchemaId: string
@@ -363,9 +292,7 @@ export interface ListSavedRunsPayload {
   query?: string
 }
 
-export interface GetMappingPayload {
-  reconciliationMappingId: string
-}
+export type GetMappingPayload = Schemas['GetMappingParams']
 
 export interface SaveMappingPayload {
   reconciliationMappingId?: string
@@ -380,14 +307,9 @@ export interface SaveDashboardPinnedSavedRunsPayload {
   pinnedSavedRunIds: string[]
 }
 
-export interface SaveSavedRunNamePayload {
-  savedRunId: string
-  runName: string
-}
+export type SaveSavedRunNamePayload = Schemas['SaveSavedRunNameParams']
 
-export interface DeleteSavedRunPayload {
-  savedRunId: string
-}
+export type DeleteSavedRunPayload = Schemas['DeleteSavedRunParams']
 
 export interface RunSavedRunDiffPayload {
   savedRunId: string
@@ -418,16 +340,7 @@ export interface GetGeneratedOutputPayload {
   format: string
 }
 
-export interface GetGeneratedOutputDifferencesPayload {
-  fileName: string
-  pageIndex?: number
-  pageSize?: number
-  buckets?: string
-  ruleFilterKey?: string
-  search?: string
-  includeFacets?: boolean
-  conclusionCode?: string
-}
+export type GetGeneratedOutputDifferencesPayload = Schemas['GetGeneratedOutputDifferencesParams']
 
 export interface ListAutomationsPayload {
   pageIndex: number
@@ -435,13 +348,9 @@ export interface ListAutomationsPayload {
   query?: string
 }
 
-export interface GetAutomationPayload {
-  automationId: string
-}
+export type GetAutomationPayload = Schemas['GetAutomationParams']
 
-export interface SyncAutomationPayload {
-  automationId: string
-}
+export type SyncAutomationPayload = Schemas['SyncAutomationParams']
 
 export interface AutomationSourcePayload {
   fileSide: string
@@ -488,32 +397,21 @@ export interface RunAutomationNowPayload {
   automationId: string
 }
 
-export interface PauseAutomationPayload {
-  automationId: string
-}
+export type PauseAutomationPayload = Schemas['PauseAutomationParams']
 
-export interface ResumeAutomationPayload {
-  automationId: string
-}
+export type ResumeAutomationPayload = Schemas['ResumeAutomationParams']
 
 export interface ListAutomationExecutionsPayload {
   automationId: string
   pageIndex: number
   pageSize: number
-  query?: string
 }
 
-export interface SubscribeRunNotificationPayload {
-  reconciliationRunResultId: string
-}
+export type SubscribeRunNotificationPayload = Schemas['SubscribeRunNotificationParams']
 
-export interface UnsubscribeRunNotificationPayload {
-  reconciliationRunResultId: string
-}
+export type UnsubscribeRunNotificationPayload = Schemas['UnsubscribeRunNotificationParams']
 
-export interface CancelReconciliationRunPayload {
-  reconciliationRunResultId: string
-}
+export type CancelReconciliationRunPayload = Schemas['CancelReconciliationRunParams']
 
 // ─── CLI sign-in (DAR-CLI-003) ─────────────────────────────────────────────────
 
@@ -543,9 +441,7 @@ export type FinishPasskeyRegistrationPayload = Schemas['FinishPasskeyRegistratio
 export type RenamePasskeyPayload = Schemas['RenamePasskeyParams']
 export type DeletePasskeyPayload = Schemas['DeletePasskeyParams']
 
-export interface RevokeCliSessionPayload {
-  cliSessionId: string
-}
+export type RevokeCliSessionPayload = Schemas['RevokeCliSessionParams']
 
 // ─── Mascot content (DAR-BE-313) ─────────────────────────────────────────────
 

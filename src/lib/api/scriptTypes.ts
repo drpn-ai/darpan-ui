@@ -1,6 +1,7 @@
 // DAR-BE-334. The active tenant's queries (facade.TenantScriptFacadeServices) on moqui-jexl: a read over what its audits
 // already keep (kept datasets, saved runs' newest differences, audit findings) and a JEXL script over it that returns a
 // summary and up to five CSV files. A schedule sends the answer by email and/or chat; whoever saves it owns it.
+import type { Schemas } from './generated'
 
 export interface TenantQuery {
   tenantQueryId: string
@@ -73,15 +74,7 @@ export interface GetTenantQueryCatalogResponse {
   audits: QueryCatalogAudit[]
 }
 
-export interface SaveTenantQueryPayload {
-  tenantQueryId?: string
-  queryName: string
-  description?: string
-  readSpecJson?: string
-  scriptBody: string
-  sampleInputJson?: string
-  isActive?: boolean
-}
+export type SaveTenantQueryPayload = Schemas['SaveTenantQueryParams']
 
 export interface SaveTenantQueryResponse {
   query: TenantQuery
@@ -120,11 +113,7 @@ export interface QueryRun {
   readText: string | null
 }
 
-export interface RunTenantQueryPayload {
-  tenantQueryId?: string
-  readSpecJson?: string
-  scriptBody?: string
-}
+export type RunTenantQueryPayload = Schemas['RunTenantQueryParams']
 
 export interface RunTenantQueryResponse {
   result: QueryRun

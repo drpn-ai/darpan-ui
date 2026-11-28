@@ -219,9 +219,7 @@ export interface SaveRecoveryEmailResponse extends ApiEnvelope {
   emailAddressMasked?: string | null
 }
 
-export interface GetPasswordResetStatusResponse {
-  available?: boolean
-}
+export type GetPasswordResetStatusResponse = Schemas['GetPasswordResetStatusResult']
 
 // Migration template (MACH P1): sourced from the generated OpenAPI contract types
 // instead of a hand-written interface. Same exported name, so consumers are
@@ -1074,17 +1072,13 @@ export interface ListGeneratedOutputsResponse extends PaginatedResponse {
 
 export type GetGeneratedOutputResponse = Schemas['GetGeneratedOutputResult']
 
-export interface GetReconciliationRunStatusPayload {
-  reconciliationRunResultId: string
-}
+export type GetReconciliationRunStatusPayload = Schemas['GetReconciliationRunStatusParams']
 
 export type GetReconciliationRunStatusResponse = Schemas['GetReconciliationRunStatusResult']
 
 export type ReconciliationRunStep = NonNullable<GetReconciliationRunStatusResponse['steps']>[number]
 
-export interface GetActiveRunResultPayload {
-  savedRunId: string
-}
+export type GetActiveRunResultPayload = Schemas['GetActiveRunResultParams']
 
 export type GetActiveRunResultResponse = Schemas['GetActiveRunResultResult']
 
