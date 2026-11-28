@@ -81,7 +81,6 @@ describe('runResults store (run-result cache)', () => {
     store.upsertOutput(output({ fileName: 'a.json', savedRunId: 'run-1', createdDate: isoDaysAgo(0) }))
     store.reset()
     expect(store.recentOutputs).toHaveLength(0)
-    expect(store.loadedAt).toBeNull()
   })
 
   it('hydrate fetches recent outputs and drops anything older than the 2-day window', async () => {
@@ -95,7 +94,6 @@ describe('runResults store (run-result cache)', () => {
     await store.hydrate()
     expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
     expect(store.recentOutputs.map((o) => o.fileName)).toEqual(['fresh.json'])
-    expect(store.loadedAt).not.toBeNull()
   })
 
   it('hydrate is de-duplicated so concurrent callers share one fetch', async () => {
@@ -105,12 +103,15 @@ describe('runResults store (run-result cache)', () => {
     expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
   })
 
-  it('hydrate surfaces an ApiCallError message and leaves loadedAt null', async () => {
-    listGeneratedOutputs.mockRejectedValue(new ApiCallError('Backend down', 503))
+  it('a failed refresh keeps the results the cache already held', async () => {
+    listGeneratedOutputs.mockResolvedValueOnce({
+      generatedOutputs: [output({ fileName: 'fresh.json', savedRunId: 'run-1', createdDate: isoDaysAgo(0) })],
+    })
     const store = useRunResultsStore()
     await store.hydrate()
-    expect(store.error).toBe('Backend down')
-    expect(store.loadedAt).toBeNull()
+    listGeneratedOutputs.mockRejectedValueOnce(new ApiCallError('Backend down', 503))
+    await store.refresh()
+    expect(store.recentOutputs.map((o) => o.fileName)).toEqual(['fresh.json'])
   })
 
   it('refresh re-fetches even after hydrate, so new run results surface (audit #11)', async () => {

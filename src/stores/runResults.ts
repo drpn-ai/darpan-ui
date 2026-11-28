@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiCallError, isAbortError } from '../lib/api/client'
+import { isAbortError } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput, GetReconciliationRunStatusResponse } from '../lib/api/types'
 
@@ -23,22 +23,6 @@ export function isActiveRunStatus(statusEnumId: string | null | undefined): bool
 // recent N — older entries get fetched on-demand via the page's existing
 // pagination path.
 const RECENT_FETCH_PAGE_SIZE = 25
-
-interface LoadState {
-  loading: boolean
-  error: string | null
-  loadedAt: number | null
-}
-
-function emptyLoadState(): LoadState {
-  return { loading: false, error: null, loadedAt: null }
-}
-
-function describeError(err: unknown, fallback: string): string {
-  if (err instanceof ApiCallError) return err.message
-  if (err instanceof Error) return err.message
-  return fallback
-}
 
 // The wire delivers timestamps as epoch milliseconds (numbers); specs and some callers use
 // ISO strings. Both must parse or the recent-window filter silently discards every server row.
@@ -65,7 +49,6 @@ function sortByCreatedDateDesc(a: GeneratedOutput, b: GeneratedOutput): number {
 
 export const useRunResultsStore = defineStore('runResults', () => {
   const _byFileName = ref<Map<string, GeneratedOutput>>(new Map())
-  const _loadState = ref<LoadState>(emptyLoadState())
 
   let _hydrationPromise: Promise<void> | null = null
   let _abortController: AbortController | null = null
@@ -73,10 +56,6 @@ export const useRunResultsStore = defineStore('runResults', () => {
   // a manual reload. Idempotent; owned by the viewing page via start/stopAutoRefresh lifecycle.
   let _refreshTimer: ReturnType<typeof setInterval> | null = null
   let _visibilityHandler: (() => void) | null = null
-
-  const loading = computed(() => _loadState.value.loading)
-  const error = computed(() => _loadState.value.error)
-  const loadedAt = computed(() => _loadState.value.loadedAt)
 
   const recentOutputs = computed<GeneratedOutput[]>(() => {
     const list = Array.from(_byFileName.value.values())
@@ -102,24 +81,18 @@ export const useRunResultsStore = defineStore('runResults', () => {
     _byFileName.value = next
   }
 
+  // A warm cache, never the only copy: every page that shows run results reads its own list when the cache
+  // has nothing, so a failed load keeps what the cache already held and the next refresh tries again.
   async function _loadRecent(signal: AbortSignal): Promise<void> {
-    _loadState.value = { loading: true, error: null, loadedAt: _loadState.value.loadedAt }
     try {
       const response = await reconciliationFacade.listGeneratedOutputs(
         { pageIndex: 0, pageSize: RECENT_FETCH_PAGE_SIZE, query: '' },
         signal,
       )
       const nowMs = Date.now()
-      const withinWindow = (response.generatedOutputs ?? []).filter((output) => isWithinRecentWindow(output, nowMs))
-      _replaceCache(withinWindow)
-      _loadState.value = { loading: false, error: null, loadedAt: nowMs }
+      _replaceCache((response.generatedOutputs ?? []).filter((output) => isWithinRecentWindow(output, nowMs)))
     } catch (err) {
       if (isAbortError(err)) return
-      _loadState.value = {
-        loading: false,
-        error: describeError(err, 'Recent run results tripped on the stairs on the way up.'),
-        loadedAt: null,
-      }
     }
   }
 
@@ -128,10 +101,6 @@ export const useRunResultsStore = defineStore('runResults', () => {
     _abortController = new AbortController()
     _hydrationPromise = _loadRecent(_abortController.signal)
     return _hydrationPromise
-  }
-
-  function ensureLoaded(): Promise<void> {
-    return hydrate()
   }
 
   // Force a fresh load, bypassing the one-shot hydrate() memoization.
@@ -261,18 +230,13 @@ export const useRunResultsStore = defineStore('runResults', () => {
     _hydrationPromise = null
     _byFileName.value = new Map()
     _runStatusById.value = new Map()
-    _loadState.value = emptyLoadState()
   }
 
   return {
-    loading,
-    error,
-    loadedAt,
     recentOutputs,
     getOutputsForSavedRun,
     getByFileName,
     hydrate,
-    ensureLoaded,
     refresh,
     startAutoRefresh,
     stopAutoRefresh,

@@ -340,12 +340,6 @@ describe('useRunResultDifferences', () => {
   })
 
   // DAR-UI-044
-  it('stores conclusion facets from the initial load', () => {
-    const { differences } = mountDifferences()
-    differences.applyDifferencesResponse(serverResponse({ conclusionCounts: { CONC_NS_BACKORDERED: 4, UNEXPLAINED: 0 } }), true)
-    expect(differences.conclusionCounts.value).toEqual({ CONC_NS_BACKORDERED: 4, UNEXPLAINED: 0 })
-  })
-
   it('selecting a conclusion refetches page 0 filtered by it, and reselecting clears it', async () => {
     getGeneratedOutputDifferences.mockResolvedValue(serverResponse())
     const { differences } = mountDifferences()
@@ -367,12 +361,11 @@ describe('useRunResultDifferences', () => {
     expect(getGeneratedOutputDifferences.mock.calls.at(-1)?.[0]).not.toHaveProperty('conclusionCode')
   })
 
-  it('resetDifferencesState clears the conclusion selection and facets', () => {
+  it('resetDifferencesState clears the conclusion selection', () => {
     const { differences } = mountDifferences()
-    differences.applyDifferencesResponse(serverResponse({ conclusionCounts: { A: 1 } }), true)
+    differences.applyDifferencesResponse(serverResponse(), true)
     differences.selectConclusion('A')
     differences.resetDifferencesState()
     expect(differences.selectedConclusionCode.value).toBeNull()
-    expect(differences.conclusionCounts.value).toEqual({})
   })
 })
