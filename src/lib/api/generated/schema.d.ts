@@ -5098,15 +5098,11 @@ export interface components {
         };
         /**
          * @description DAR-BE-301. Start a sign-in with a passkey alone (no password). Request options for
-         *                 navigator.credentials.get() and a challengeToken for finish#PasskeyFirstSignIn. With a username, allowCredentials
-         *                 lists that account's passkeys, and for a username that names no account with a passkey one decoy credential
-         *                 (the same for the same username, which no authenticator holds); with no username it is empty and the browser
-         *                 offers its own passkeys for this site. The answer never says whether the username exists. At most 10 begins a minute from one address (TOO_MANY_ATTEMPTS).
+         *                 navigator.credentials.get() and a challengeToken for finish#PasskeyFirstSignIn. Discoverable only (DAR-OPS-029 OC77,
+         *                 Aditi 2026-11-28): allowCredentials is always empty and no account is read, so the browser offers its own passkeys
+         *                 for this site and every begin answers alike. At most 10 begins a minute from one address (TOO_MANY_ATTEMPTS).
          */
-        BeginPasskeyFirstSignInParams: {
-            /** @description Optional: the username or email typed first. */
-            username?: string;
-        };
+        BeginPasskeyFirstSignInParams: Record<string, never>;
         BeginPasskeyFirstSignInResult: {
             /** @description True when the call completed without facade errors. */
             ok?: boolean;
@@ -5122,8 +5118,8 @@ export interface components {
             /** @description For finish#PasskeyFirstSignIn: held in page memory only, good for one finish. */
             challengeToken?: string;
             /**
-             * @description PublicKeyCredentialRequestOptionsJSON: {challenge, rpId, timeout, allowCredentials[{type, id,
-             *                         transports}], userVerification: "required"}.
+             * @description PublicKeyCredentialRequestOptionsJSON: {challenge, rpId, timeout, allowCredentials: [],
+             *                         userVerification: "required"}.
              */
             publicKeyOptions?: string;
             /** @description Seconds the challengeToken lives: 300. */
