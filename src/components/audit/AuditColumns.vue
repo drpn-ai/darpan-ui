@@ -530,6 +530,19 @@
                   <template v-if="check.matchedBy"><dt>Matched by</dt><dd>{{ check.matchedBy }}</dd></template>
                   <template v-if="check.window"><dt>Read</dt><dd>{{ shortRange(check.window.from, check.window.thru) }}</dd></template>
                 </dl>
+                <!-- D11 (OC53). What the run read that no rule of this check targets: no statement owns it, so it is listed, never counted. -->
+                <details v-if="check.outsideRules?.count" class="audit-fold" :data-testid="`audit-outside-${check.id}`">
+                  <summary class="micro-label">Not covered by any rule <span class="audit-fold-count">{{ check.outsideRules.count }}</span></summary>
+                  <ul class="audit-history">
+                    <li v-for="row in check.outsideRules.rows" :key="row.recordKey" data-testid="audit-outside-row">
+                      <span>{{ row.recordKey }}</span><span v-if="row.note" class="audit-row-sub">{{ row.note }}</span>
+                    </li>
+                  </ul>
+                  <p v-if="check.outsideRules.omitted" class="section-note" data-testid="audit-outside-more">{{ check.outsideRules.omitted }} more</p>
+                  <button v-if="agent" type="button" class="audit-more" :data-testid="`audit-outside-agent-${check.id}`" @click="emit('agent', true)">
+                    Explain to the agent
+                  </button>
+                </details>
               </article>
               <p class="audit-row-sub" data-testid="audit-statement-counts">
                 {{ statementDoc.counts.open }} open · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today<template v-if="statementDoc.waiting"> · {{ statementDoc.waiting }} under an earlier step</template>

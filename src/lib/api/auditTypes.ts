@@ -136,6 +136,27 @@ export interface AuditStatementCheck {
   systems?: string[]
   /** DAR-UI-063. The days this morning's run read: the period to date, or the days a person played. */
   window?: { from: string; thru: string } | null
+  /**
+   * D11 (OC53). The rows of this morning's run that no rule of the check targets: listed, never counted. Null when the check
+   * did not run that morning (or ran before D11); { count: 0, rows: [], omitted: 0 } when the run had none.
+   */
+  outsideRules?: AuditOutsideRules | null
+}
+
+/** D11. A check's rows outside every rule: count is the true total, rows the first 200, omitted the rest. */
+export interface AuditOutsideRules {
+  count: number
+  rows: AuditOutsideRow[]
+  omitted: number
+}
+
+export interface AuditOutsideRow {
+  recordKey: string
+  diffType: string
+  bucket: string
+  note: string | null
+  /** Shaped like a finding's records: system -> record type -> records. */
+  records: Record<string, Record<string, unknown[]>>
 }
 
 export interface AuditFindingSummary {
@@ -254,7 +275,10 @@ export interface AuditReport {
   summary: AuditFindingCounts & {
     oldestOpen: { id: string; statement: string; firstFound: string; ageDays: number } | null
     byCategory: Record<string, AuditFindingCounts>
+    /** D11. Rows outside every rule, all checks together; never part of the counts. Null when no check's run has the data. */
+    outsideRules?: number | null
   }
+  /** Keyed by category code; OC80: "uncategorised" (label Uncategorised) follows the four when a statement has no audit category. */
   categories: Record<string, AuditCategory>
 }
 

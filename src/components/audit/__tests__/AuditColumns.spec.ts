@@ -385,3 +385,50 @@ describe('AuditColumns findings under each pill', () => {
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('3')
   })
 })
+
+// D11 (Aditi 2026-11-28: "U1, but show the rest"; OC53). The rows of a check's run that no rule targets: no statement owns
+// them, so they are listed under their check as one group and never added to a count.
+describe('AuditColumns rows outside every rule', () => {
+  const OUTSIDE = {
+    count: 3, omitted: 1, rows: [
+      { recordKey: 'M1/01', diffType: 'MISSING_IN_FILE_2', bucket: 'MISSING_FROM_FILE_2', note: 'not in NetSuite', records: {} },
+      { recordKey: 'M2/01', diffType: 'MISSING_IN_FILE_2', bucket: 'MISSING_FROM_FILE_2', note: null, records: {} },
+    ],
+  }
+
+  function mountStatement(outsideRules: unknown, extra: Record<string, unknown> = {}) {
+    const r = report(null)
+    const st = (r.categories.orders!.statements.R2 as unknown as Record<string, unknown>)
+    st.checks = [{ id: 'inv', label: 'Invoices with no Etail id', status: 'ran', reason: null, matchedBy: null, compared: null, outsideRules }]
+    return mount(AuditColumns, {
+      attachTo: document.body,
+      props: {
+        report: r, category: 'orders', statement: 'R2', finding: '', source: '', filter: 'all', level: 3, findingDoc: null,
+        findingLoading: false, findingError: '', more: emptyFindingsMore(), exporting: false, verifying: false, ...extra,
+      },
+    })
+  }
+
+  it('lists them under their check with how many more there are, and counts none of them', () => {
+    const w = mountStatement(OUTSIDE)
+    const group = w.get('[data-testid="audit-outside-inv"]')
+    expect(group.text()).toContain('Not covered by any rule')
+    expect(group.text()).toContain('3')
+    expect(group.findAll('[data-testid="audit-outside-row"]').map((row) => row.text())).toEqual(['M1/01not in NetSuite', 'M2/01'])
+    expect(group.get('[data-testid="audit-outside-more"]').text()).toBe('1 more')
+    expect(w.get('[data-testid="audit-statement-counts"]').text()).toContain('1 open')
+  })
+
+  it('shows nothing when the run had none or there was no run that morning', () => {
+    expect(mountStatement({ count: 0, rows: [], omitted: 0 }).find('[data-testid="audit-outside-inv"]').exists()).toBe(false)
+    expect(mountStatement(null).find('[data-testid="audit-outside-inv"]').exists()).toBe(false)
+    expect(mountStatement(undefined).find('[data-testid="audit-outside-inv"]').exists()).toBe(false)
+  })
+
+  it('offers them to the agent only when the agent is on', async () => {
+    expect(mountStatement(OUTSIDE).find('[data-testid="audit-outside-agent-inv"]').exists()).toBe(false)
+    const w = mountStatement(OUTSIDE, { agent: true })
+    await w.get('[data-testid="audit-outside-agent-inv"]').trigger('click')
+    expect(w.emitted('agent')?.at(-1)).toEqual([true])
+  })
+})

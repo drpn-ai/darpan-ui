@@ -531,6 +531,11 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
 
   /* ── Audits (DAR-UI-094) ────────────────────────────────────────────────────── */
+  // D11 (OC53). Hands the rows no rule covers to the agent.
+  'explain to the agent': {
+    title: 'Explain to the agent',
+    body: 'opens the agent beside this check. Tell it what these rows are and it drafts the rule or cause, so the next run sorts them on its own.',
+  },
   'retry from last read': {
     title: 'Retry from last read',
     body: 'runs this check again from what its last read already fetched, so no system is read twice. The rest of the audit stays as it is.',

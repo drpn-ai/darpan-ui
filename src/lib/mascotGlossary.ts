@@ -402,6 +402,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Evidence',
     body: 'the tests run on this one record, passed out of total. The failed ones are why it is a finding; they show only when no cause explains it.',
   },
+  // D11 (OC53). The group of a check's rows no rule of it targets.
+  auditNotCoveredByAnyRule: {
+    title: 'Not covered by any rule',
+    body: 'what this check read that none of its rules looks at. No statement owns these, so they count nowhere until someone says what they are.',
+  },
   auditHistory: {
     title: 'History',
     body: 'every time this finding was found, reopened or closed, and by whom. One that keeps coming back points at a sync, not a one-off mistake.',

@@ -86,6 +86,15 @@ function report(overrides: Partial<AuditReport['health']> = {}): AuditReport {
 }
 
 describe('auditColumns', () => {
+  // OC80: a statement whose category is not one of the audit's is listed under "Uncategorised" (the report sends it after
+  // the four, with its label), never dropped; the board takes the label from the report like any category.
+  it('lists an uncategorised group after the categories, by the label the report gives it', () => {
+    const r = report()
+    r.categories.uncategorised = category('Uncategorised', [statement('X1', 1)], 1)
+    const items = categoryItems(r)
+    expect(items.at(-1)).toMatchObject({ id: 'uncategorised', label: 'Uncategorised', short: 'Uncategorised', open: 1, attention: true })
+  })
+
   it('lists Run health first, then each category with its counts and a one-word rail label', () => {
     const items = categoryItems(report())
     expect(items.map((item) => item.id)).toEqual([HEALTH, 'orders', 'refunds', 'exchanges'])
