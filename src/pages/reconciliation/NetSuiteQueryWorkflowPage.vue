@@ -268,12 +268,9 @@ interface QueryForm {
   nsAuthConfigId: string
   description: string
   recordType: string
-  fromTable: string
   dateColumn: string
   queryTemplate: string
   joinKeyFieldName: string
-  originFieldName: string
-  isActive: string
 }
 
 interface MatchRuleRow {
@@ -335,12 +332,9 @@ function createDefaultForm(): QueryForm {
     nsAuthConfigId: '',
     description: '',
     recordType: '',
-    fromTable: 'transaction',
     dateColumn: 'trandate',
     queryTemplate: 'RECORDS',
     joinKeyFieldName: '',
-    originFieldName: '',
-    isActive: 'Y',
   }
 }
 
@@ -451,8 +445,9 @@ const matchRulesPayload = computed<NsMatchRule[]>(() => {
     }))
 })
 
+// A saved query stays saved: the server mints a new id on every save, so a second press would make a second query.
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value || loading.value) return true
+  if (!canEditTenantSettings.value || loading.value || success.value) return true
 
   switch (currentCreateStep.value.id) {
     case 'nsAuthConfigId':
@@ -540,12 +535,13 @@ function basePayload(): NsSuiteQlQuery {
   return {
     nsAuthConfigId: form.nsAuthConfigId,
     recordType: form.recordType.trim(),
-    fromTable: form.fromTable.trim() || 'transaction',
+    // This page reads transactions only, and a query made here names no origin field.
+    fromTable: 'transaction',
     dateColumn: form.dateColumn,
     queryTemplate: form.queryTemplate,
     matchRules: matchRulesPayload.value,
     joinKeyFieldName: form.joinKeyFieldName.trim(),
-    originFieldName: form.originFieldName.trim(),
+    originFieldName: '',
     fields: fieldsPayload.value,
   }
 }
@@ -582,12 +578,9 @@ async function load(): Promise<void> {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
-  if (currentCreateStep.value.id === 'review') {
-    await save()
-    return
-  }
   if (submitDisabled.value) return
-  goNext()
+  if (currentCreateStep.value.id === 'review') await save()
+  else goNext()
 }
 
 async function runPreview(): Promise<void> {
@@ -613,11 +606,6 @@ async function runPreview(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
-    errors.value = ['You do not have permission to save NetSuite queries for the active tenant.']
-    return
-  }
-
   loading.value = true
   errors.value = []
   success.value = null
@@ -625,7 +613,7 @@ async function save(): Promise<void> {
     const payload: NsSuiteQlQuery = {
       ...basePayload(),
       description: form.description.trim(),
-      isActive: form.isActive,
+      isActive: 'Y',
     }
     const response = await netSuiteQueryFacade.save(payload, pageAbortController.signal)
     const savedId = response.savedQuery?.nsSuiteQlSourceQueryId

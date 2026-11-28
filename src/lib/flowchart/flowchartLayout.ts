@@ -7,16 +7,16 @@ import type { FlowchartQuestion } from '../api/flowchartTypes'
 // Sizes follow the design system's shipped board nodes: a question is a single-line pill like the
 // rules board's field pill (min-height 2.75rem), a finding a small box, and each "+" is an
 // app-icon-action (2.8rem). The "+" positions are part of the layout so they are tested for overlap too.
-export const QUESTION_WIDTH = 300
+const QUESTION_WIDTH = 300
 // Narrow mode must fit a phone's board (about 230px inside the static panel's padding at 420px wide).
 const QUESTION_WIDTH_NARROW = 216
-export const QUESTION_HEIGHT = 44
-export const FINDING_WIDTH = 200
+const QUESTION_HEIGHT = 44
+const FINDING_WIDTH = 200
 const FINDING_WIDTH_NARROW = 140
-export const FINDING_HEIGHT = 36
+const FINDING_HEIGHT = 36
 export const ADD_SIZE = 45
-export const COLUMN_GAP = 48
-export const ROW_GAP = 96
+const COLUMN_GAP = 48
+const ROW_GAP = 96
 
 // Narrow mode's yes lane: right of the finding below the question, inside the question's own width.
 const YES_LANE_INSET = 12

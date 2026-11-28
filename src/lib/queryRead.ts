@@ -38,13 +38,13 @@ export const MAX_INPUTS = 10
 export const MAX_LAST_DAYS = 3_660
 export const INPUT_NAME = /^[a-z][A-Za-z0-9]{0,39}$/
 export const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_.]{0,99}$/
-export const FINDING_WINDOW_FIELD = 'firstFoundDate'
+const FINDING_WINDOW_FIELD = 'firstFoundDate'
 /** AuditFindingQuerySource.FIELDS: every audit's findings have these, so they stand in when the catalog is missing. */
-export const FINDING_FIELDS: readonly string[] = ['statement', 'check', 'recordKey', 'period', 'state', 'headline',
+const FINDING_FIELDS: readonly string[] = ['statement', 'check', 'recordKey', 'period', 'state', 'headline',
   'firstFoundDate', 'lastSeenDate', 'timesSeen', 'expectedAmount', 'actualAmount', 'differenceAmount', 'currencyUomId',
   'conclusion', 'closedStamp']
 
-export const SOURCE_KINDS: readonly ReadSourceKind[] = ['auditFindings', 'runResult', 'dataset']
+const SOURCE_KINDS: readonly ReadSourceKind[] = ['auditFindings', 'runResult', 'dataset']
 export const SOURCE_ID_KEY: Record<ReadSourceKind, 'auditId' | 'savedRunId' | 'datasetId'> = {
   auditFindings: 'auditId',
   runResult: 'savedRunId',
@@ -147,7 +147,7 @@ export function catalogFields(source: ReadSourceKind, sourceId: string, catalog:
 }
 
 /** The source by name, or its id when the catalog does not have it. */
-export function sourceLabel(input: ReadInput, catalog: QueryCatalog | null): string {
+function sourceLabel(input: ReadInput, catalog: QueryCatalog | null): string {
   const source = input.source
   const id = inputSourceId(input)
   if (source === 'auditFindings') {
@@ -164,7 +164,7 @@ export function sourceLabel(input: ReadInput, catalog: QueryCatalog | null): str
 
 // ---- conditions
 
-export function opWords(op: string): string {
+function opWords(op: string): string {
   return CONDITION_OPS.find((item) => item.op === op)?.words ?? op
 }
 
@@ -203,7 +203,7 @@ export function valueFrom(text: string, op: string): unknown {
   return text.trim()
 }
 
-export function conditionWords(condition: ReadCondition): string {
+function conditionWords(condition: ReadCondition): string {
   const field = String(condition.field ?? '')
   if (NO_VALUE_OPS.has(condition.op)) return `${field} ${opWords(condition.op)}`
   if (condition.op === 'between' && Array.isArray(condition.value)) {

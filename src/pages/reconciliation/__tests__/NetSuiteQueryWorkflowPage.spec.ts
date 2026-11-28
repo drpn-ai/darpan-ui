@@ -213,6 +213,11 @@ describe('NetSuiteQueryWorkflowPage', () => {
     expect(saveQuery.mock.calls[0]![0].matchRules).toEqual([])
     expect(push).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Saved.')
+
+    // The server mints a new id on every save, so a second press would make a second query.
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(saveQuery).toHaveBeenCalledTimes(1)
   })
 
   it('shows every validation message the save answers with, as written', async () => {

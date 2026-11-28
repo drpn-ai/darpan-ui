@@ -12,7 +12,7 @@ vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(), saveReconciliation: vi.fn(),
     deleteReconciliationQuestion: vi.fn(), runReconciliation: vi.fn(), getReconciliationExecution: vi.fn(),
-    listReconciliationExecutions: vi.fn(), getLifecycleRuleOptions: vi.fn(), saveLifecycleRule: vi.fn(), deleteLifecycleRule: vi.fn(),
+    listReconciliationExecutions: vi.fn(),
   },
 }))
 
@@ -142,6 +142,8 @@ describe('RunFlowchartPage', () => {
       const w = mount(RunFlowchartPage)
       await flushPromises()
       expect(w.find('[data-testid="lifecycle-board"]').exists()).toBe(true)
+      // The board takes no narrow prop; a stale binding would fall through as an attribute.
+      expect(w.get('[data-testid="lifecycle-board"]').attributes()).not.toHaveProperty('narrow')
       expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(false)
       expect(w.text()).toContain('Billed, never shipped')
       expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages')

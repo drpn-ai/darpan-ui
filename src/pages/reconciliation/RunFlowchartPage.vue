@@ -34,7 +34,7 @@
       </StaticPageSection>
 
       <StaticPageSection v-if="isStages && isResult" title="Where Records Stopped">
-        <LifecycleBoard :board="board" :narrow="narrow" :can-open="canOpenPlace" :not-finding="notFinding" @open="openPlace" />
+        <LifecycleBoard :board="board" :can-open="canOpenPlace" :not-finding="notFinding" @open="openPlace" />
       </StaticPageSection>
       <StaticPageSection v-else-if="!isStages" title="Questions">
         <RunFlowchartBoard
@@ -60,8 +60,6 @@
           Add Question
         </button>
       </StaticPageSection>
-
-
 
       <StaticPageSection v-if="questionRuns.length && !isStages" title="Question Runs">
         <div class="static-page-tile-grid static-page-record-grid">
@@ -121,9 +119,9 @@
             class="static-page-tile run-history-tile run-history-featured-tile"
             data-testid="flowchart-history-featured"
           >
-            <div class="run-history-tile__head" :class="{ 'run-history-tile__head--status': mostRecent.status.label !== 'Done' }">
+            <div class="run-history-tile__head" :class="{ 'run-history-tile__head--status': !mostRecent.done }">
               <span class="static-page-tile-title">{{ mostRecent.started }}</span>
-              <StatusBadge v-if="mostRecent.status.label !== 'Done'" :label="mostRecent.status.label" :tone="mostRecent.status.tone" />
+              <StatusBadge v-if="!mostRecent.done" :label="mostRecent.status.label" :tone="mostRecent.status.tone" />
             </div>
             <dl class="run-history-metrics run-history-metrics--featured">
               <div v-for="metric in metricsOf(mostRecent.id)" :key="metric.label"><dt>{{ metric.label }}</dt><dd>{{ metric.value }}</dd></div>
@@ -141,9 +139,9 @@
               class="static-page-tile run-history-tile"
               :data-testid="`flowchart-history-tile-${tile.id}`"
             >
-              <div class="run-history-tile__head" :class="{ 'run-history-tile__head--status': tile.status.label !== 'Done' }">
+              <div class="run-history-tile__head" :class="{ 'run-history-tile__head--status': !tile.done }">
                 <span class="static-page-tile-title">{{ tile.started }}</span>
-                <StatusBadge v-if="tile.status.label !== 'Done'" :label="tile.status.label" :tone="tile.status.tone" />
+                <StatusBadge v-if="!tile.done" :label="tile.status.label" :tone="tile.status.tone" />
               </div>
               <dl class="run-history-metrics">
                 <div v-for="metric in metricsOf(tile.id)" :key="metric.label"><dt>{{ metric.label }}</dt><dd>{{ metric.value }}</dd></div>
@@ -162,7 +160,6 @@
         </StaticPageSection>
       </template>
     </template>
-
 
     <template #actions>
       <div class="action-row">
@@ -276,14 +273,11 @@ const isResult = computed(() => Boolean(route.params.reconciliationExecutionId))
 
 const run = ref<FlowchartRun | null>(null)
 const questions = ref<FlowchartQuestion[]>([])
-// The START rule is drawn as the start box, not asked as a question, so it is not counted.
-const typeDetail = computed(() => {
-  const what = isStages.value
-    ? `${board.value.stages.length} ${board.value.stages.length === 1 ? 'stage' : 'stages'}`
-    : questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)
-  // The days are chosen each time it runs (RunFlowchartStartPage), so they are no part of what the run is.
-  return what
-})
+// The START rule is drawn as the start box, not asked as a question, so it is not counted. The days are chosen
+// each time it runs (RunFlowchartStartPage), so they are no part of what the run is.
+const typeDetail = computed(() => (isStages.value
+  ? `${board.value.stages.length} ${board.value.stages.length === 1 ? 'stage' : 'stages'}`
+  : questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)))
 const rules = ref<SavedRunSummary[]>([])
 const loading = ref(true)
 const pageError = ref<string | null>(null)
@@ -414,6 +408,8 @@ const historyTiles = computed(() => executions.value.map((e) => {
   return {
     id: e.reconciliationExecutionId,
     active: word === 'Running',
+    // A finished run's tile shows no badge; any other outcome says so.
+    done: word === 'Done',
     started: formatDateTime(e.startedDate, { locale: 'en-US' }),
     window: windowText(e.windowStartDate, e.windowEndDate),
     status: { label: word, tone: STATUS_TONES[word] ?? 'neutral' },
