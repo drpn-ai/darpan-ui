@@ -258,7 +258,7 @@ import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowSelect from '../workflow/WorkflowSelect.vue'
-import { ApiCallError, isAbortError } from '../../lib/api/client'
+import { isAbortError, serviceErrors } from '../../lib/api/client'
 import { auditCheckFacade } from '../../lib/api/authoringFacade'
 import type {
   AuditCheckDetail,
@@ -460,16 +460,6 @@ function selectRun(savedRunId: string): void {
 
 function asList(value: string | string[]): string[] {
   return Array.isArray(value) ? value : [value].filter(Boolean)
-}
-
-/** A refusal carries every sentence in `errors`; the thrown error names only the first. */
-function serviceErrors(caught: unknown, fallback: string): string[] {
-  if (caught instanceof ApiCallError) {
-    const result = (caught.details as { result?: { errors?: unknown } } | undefined)?.result
-    const listed = Array.isArray(result?.errors) ? result.errors.map((item) => String(item)).filter(Boolean) : []
-    return listed.length ? listed : [caught.message]
-  }
-  return [caught instanceof Error && caught.message ? caught.message : fallback]
 }
 
 let abort = new AbortController()
