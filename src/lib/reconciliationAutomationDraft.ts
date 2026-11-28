@@ -165,8 +165,10 @@ export function buildSaveAutomationPayload(
     relativeWindowCount: automationWindowNeedsCount(draft.relativeWindowTypeEnumId) ? draft.relativeWindowCount : undefined,
     customWindowStartDate: automationWindowUsesCustomRange(draft.relativeWindowTypeEnumId) ? draft.customWindowStartDate : undefined,
     customWindowEndDate: automationWindowUsesCustomRange(draft.relativeWindowTypeEnumId) ? draft.customWindowEndDate : undefined,
-    maxWindowDays: draft.maxWindowDays ?? 28,
-    splitWindowDays: draft.splitWindowDays ?? 28,
+    // Sent only when the draft holds them (an edit sends back what was stored); a new automation
+    // omits them and takes the backend default.
+    maxWindowDays: draft.maxWindowDays,
+    splitWindowDays: draft.splitWindowDays,
     isActive: draft.isActive ?? true,
     chatSpaceId: draft.chatSpaceChoice === 'none' ? '' : draft.chatSpaceId,
     sources: [

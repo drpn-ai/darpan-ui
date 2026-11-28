@@ -529,8 +529,6 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       scheduleExpr: '0 30 7 ? * TUE',
       windowTimeZone: 'UTC',
       isActive: true,
-      maxWindowDays: 28,
-      splitWindowDays: 28,
       chatSpaceId: '',
       sources: [
         expect.objectContaining({
@@ -784,7 +782,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.find('[data-testid="automation-edit-active-field"]').exists()).toBe(true)
   })
 
-  function editWithWindow(relativeWindowTypeEnumId: string, relativeWindowCount?: number) {
+  function editWithWindow(relativeWindowTypeEnumId: string, relativeWindowCount?: number, stored: Record<string, unknown> = {}) {
     route.name = 'reconciliation-automation-edit'
     route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
     route.params = { automationId: 'AUT_ORDER_SYNC' }
@@ -804,6 +802,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
         relativeWindowTypeEnumId,
         relativeWindowCount,
         active: true,
+        ...stored,
         sources: [
           { fileSide: 'FILE_1', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'OMS', systemMessageRemoteId: 'OMS_REMOTE' },
           { fileSide: 'FILE_2', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'SHOPIFY', systemMessageRemoteId: 'SHOPIFY_REMOTE' },
@@ -1428,6 +1427,99 @@ describe('ReconciliationAutomationWorkflowPage', () => {
         expect.any(AbortSignal),
       )
     })
+  })
+
+  // OC-U03a (Coordinator OC8): a custom window's picked days are midnight in the automation's
+  // schedule zone, saved and read in that zone. The backend uses the stored instant as-is
+  // (AutomationExecutionSupport, WINDOW_CUSTOM), so a UTC-midnight bound shifted every non-UTC tenant.
+  describe('custom date window days are the schedule zone\'s days', () => {
+    async function mountCustomWindow(timezone: string, start: string, end: string): Promise<ReturnType<typeof mount>> {
+      route.name = 'reconciliation-automation-edit'
+      route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+      route.params = { automationId: 'AUT_ORDER_SYNC' }
+      getAutomation.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: {
+          automationId: 'AUT_ORDER_SYNC',
+          automationName: 'Daily order sync',
+          savedRunId: 'RS_ORDER_SYNC',
+          savedRunType: 'ruleset',
+          savedRun: optionsResponse().savedRuns[0],
+          inputModeEnumId: 'AUT_IN_API_RANGE',
+          scheduleExpr: '0 0 6 * * ?',
+          timezone,
+          relativeWindowTypeEnumId: 'AUT_WIN_CUSTOM',
+          customWindowStartDate: start,
+          customWindowEndDate: end,
+          active: true,
+          sources: [
+            { fileSide: 'FILE_1', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'OMS', systemMessageRemoteId: 'OMS_REMOTE' },
+            { fileSide: 'FILE_2', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'SHOPIFY', systemMessageRemoteId: 'SHOPIFY_REMOTE' },
+          ],
+        },
+      })
+      const wrapper = mount(ReconciliationAutomationWorkflowPage)
+      await flushPromises()
+      return wrapper
+    }
+
+    function shownDays(wrapper: ReturnType<typeof mount>): [string, string] {
+      return [
+        (wrapper.get('[data-testid="automation-custom-window-start"]').element as HTMLInputElement).value,
+        (wrapper.get('[data-testid="automation-custom-window-end"]').element as HTMLInputElement).value,
+      ]
+    }
+
+    async function saveAndReadBounds(wrapper: ReturnType<typeof mount>): Promise<[string, string]> {
+      await wrapper.get('[data-testid="save-automation"]').trigger('click')
+      await flushPromises()
+      const payload = saveAutomation.mock.calls[0]?.[0]
+      return [payload.customWindowStartDate, payload.customWindowEndDate]
+    }
+
+    it('saves an IST tenant\'s Nov 1-7 as IST midnights, end exclusive', async () => {
+      const wrapper = await mountCustomWindow('Asia/Kolkata', '2026-09-30T18:30:00.000Z', '2026-10-07T18:30:00.000Z')
+      expect(shownDays(wrapper)).toEqual(['2026-10-01', '2026-10-07'])
+
+      await wrapper.get('[data-testid="automation-custom-window-start"]').setValue('2026-11-01')
+      await wrapper.get('[data-testid="automation-custom-window-end"]').setValue('2026-11-07')
+
+      expect(await saveAndReadBounds(wrapper)).toEqual(['2026-10-31T18:30:00.000Z', '2026-11-07T18:30:00.000Z'])
+    })
+
+    it('reads a legacy UTC-midnight row on a Pacific tenant as its UTC days, and re-saves them as Pacific midnights', async () => {
+      const wrapper = await mountCustomWindow('America/Los_Angeles', '2026-11-01T00:00:00.000Z', '2026-11-08T00:00:00.000Z')
+
+      // Not Oct 31: an exact 00:00Z is never a real Pacific midnight, so it is the old UTC-midnight save.
+      expect(shownDays(wrapper)).toEqual(['2026-11-01', '2026-11-07'])
+      // Nov 1 00:00 is still PDT (UTC-7); Nov 8 00:00 is PST (UTC-8).
+      expect(await saveAndReadBounds(wrapper)).toEqual(['2026-11-01T07:00:00.000Z', '2026-11-08T08:00:00.000Z'])
+    })
+
+    it('leaves a UTC tenant\'s window exactly as it was', async () => {
+      const wrapper = await mountCustomWindow('UTC', '2026-11-01T00:00:00.000Z', '2026-11-08T00:00:00.000Z')
+
+      expect(shownDays(wrapper)).toEqual(['2026-11-01', '2026-11-07'])
+      expect(await saveAndReadBounds(wrapper)).toEqual(['2026-11-01T00:00:00.000Z', '2026-11-08T00:00:00.000Z'])
+    })
+  })
+
+  // OC-U03b (Coordinator OC9): the edit form sent 28/28 over whatever the automation stored.
+  it('keeps the stored window sizes through an unrelated edit', async () => {
+    editWithWindow('AUT_WIN_PREV_DAY', undefined, { maxWindowDays: 14, splitWindowDays: 7 })
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="automationName"]').setValue('Renamed')
+    await wrapper.get('[data-testid="save-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ automationName: 'Renamed', maxWindowDays: 14, splitWindowDays: 7 }),
+      expect.any(AbortSignal),
+    )
   })
 
   describe('syncing an automation with its saved run', () => {

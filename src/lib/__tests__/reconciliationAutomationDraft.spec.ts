@@ -73,8 +73,6 @@ describe('reconciliationAutomationDraft', () => {
       scheduleExpr: 'PT1H',
       windowTimeZone: 'UTC',
       isActive: true,
-      maxWindowDays: 28,
-      splitWindowDays: 28,
       sources: [
         {
           fileSide: 'FILE_1',
@@ -100,6 +98,12 @@ describe('reconciliationAutomationDraft', () => {
         },
       ],
     })
+  })
+
+  it('omits window sizes on a new automation, so the backend default applies', () => {
+    const payload = buildSaveAutomationPayload(createDraft(), savedRun)
+    expect(payload).not.toHaveProperty('maxWindowDays')
+    expect(payload).not.toHaveProperty('splitWindowDays')
   })
 
   it('builds API source payloads with relative window fields for existing-run automations', () => {

@@ -386,6 +386,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useMascotStore } from '../../stores/mascot'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
+import { addDays, displayCalendarDayOf, displayDayStart, formatDateInputValue, parseDateInput } from '../../lib/utils/date'
 import { useCronExpression, SCHEDULE_WEEKDAY_OPTIONS, type SchedulePreset } from '../../composables/useCronExpression'
 import { useAutomationSourceDraft, type ApiSourceSelectOption } from '../../composables/useAutomationSourceDraft'
 
@@ -440,6 +441,9 @@ const relativeWindowTypeEnumId = ref('AUT_WIN_LAST_DAYS')
 const relativeWindowCount = ref<number | null>(1)
 const customWindowStartDate = ref('')
 const customWindowEndDate = ref('')
+// What the automation stored; undefined for a new one, which takes the backend default.
+const maxWindowDays = ref<number | undefined>()
+const splitWindowDays = ref<number | undefined>()
 // Blank means the automation has not pinned a zone of its own yet, so it follows the tenant's.
 // Resolved through scheduleTimeZone below -- read that, never this, outside the restore paths.
 const windowTimeZone = ref('')
@@ -1039,10 +1043,11 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   windowTimeZone: scheduleTimeZone.value,
   relativeWindowTypeEnumId: usesApi.value ? relativeWindowTypeEnumId.value || undefined : undefined,
   relativeWindowCount: usesApi.value && dateWindowNeedsCount.value ? relativeWindowCount.value ?? undefined : undefined,
-  customWindowStartDate: usesApi.value && dateWindowUsesCustomRange.value ? dateStartIso(customWindowStartDate.value) : undefined,
-  customWindowEndDate: usesApi.value && dateWindowUsesCustomRange.value ? dateEndIso(customWindowEndDate.value) : undefined,
-  maxWindowDays: 28,
-  splitWindowDays: 28,
+  customWindowStartDate: usesApi.value && dateWindowUsesCustomRange.value ? customWindowBound(customWindowStartDate.value, 0) : undefined,
+  // The form's end day is inclusive; the stored bound is the next day's midnight.
+  customWindowEndDate: usesApi.value && dateWindowUsesCustomRange.value ? customWindowBound(customWindowEndDate.value, 1) : undefined,
+  maxWindowDays: maxWindowDays.value,
+  splitWindowDays: splitWindowDays.value,
   isActive: isActive.value,
   returnLabel: returnLabel.value || undefined,
   returnPath: returnPath.value || undefined,
@@ -1103,29 +1108,28 @@ function applyDeterministicDefaults(): void {
   ensureAutomationName()
 }
 
-function dateStartIso(value: string): string | undefined {
-  return value ? `${value}T00:00:00.000Z` : undefined
+/**
+ * A custom window's days are the schedule zone's days (OC-U03a): the backend runs the stored instant
+ * as-is, so the bound is midnight of the picked day in scheduleTimeZone, not UTC midnight.
+ */
+function customWindowBound(value: string, dayOffset: number): string | undefined {
+  const day = parseDateInput(value)
+  return day ? displayDayStart(addDays(day, dayOffset), scheduleTimeZone.value).toISOString() : undefined
 }
 
-function dateEndIso(value: string): string | undefined {
-  if (!value) return undefined
-  const endDate = new Date(`${value}T00:00:00.000Z`)
-  endDate.setUTCDate(endDate.getUTCDate() + 1)
-  return endDate.toISOString()
-}
-
-function previousDateValue(value: string): string {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value.slice(0, 10)
-  parsed.setUTCDate(parsed.getUTCDate() - 1)
-  return parsed.toISOString().slice(0, 10)
-}
-
-function dateInputValue(value: string | undefined): string {
+/**
+ * The form day for a stored bound, read in the schedule zone. An instant at exactly 00:00:00.000Z is
+ * read as its UTC date: before OC-U03a this page saved UTC midnight, and a real midnight in a zone
+ * with a non-zero offset is never exactly 00:00Z (in a zero-offset zone the two readings agree).
+ */
+function customWindowDay(value: string | undefined, dayOffset: number): string {
   if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value.slice(0, 10)
-  return parsed.toISOString().slice(0, 10)
+  const instant = new Date(value)
+  if (Number.isNaN(instant.getTime())) return value.slice(0, 10)
+  const day = instant.toISOString().endsWith('T00:00:00.000Z')
+    ? new Date(instant.getUTCFullYear(), instant.getUTCMonth(), instant.getUTCDate())
+    : displayCalendarDayOf(instant, scheduleTimeZone.value)
+  return formatDateInputValue(addDays(day, dayOffset))
 }
 
 function ensureAutomationName(): void {
@@ -1365,9 +1369,12 @@ function hydrateAutomation(automation: AutomationRecord): void {
   cron.syncFromExpression(scheduleExpr.value)
   relativeWindowTypeEnumId.value = offeredWindowTypeOr(automation.relativeWindowTypeEnumId, relativeWindowTypeEnumId.value)
   relativeWindowCount.value = automation.relativeWindowCount ?? relativeWindowCount.value
-  customWindowStartDate.value = dateInputValue(automation.customWindowStartDate)
-  customWindowEndDate.value = automation.customWindowEndDate ? previousDateValue(automation.customWindowEndDate) : ''
+  // The zone first: the custom window's days are read in it.
   windowTimeZone.value = normalizeTimezoneId(automation.timezone)
+  customWindowStartDate.value = customWindowDay(automation.customWindowStartDate, 0)
+  customWindowEndDate.value = customWindowDay(automation.customWindowEndDate, -1)
+  maxWindowDays.value = automation.maxWindowDays
+  splitWindowDays.value = automation.splitWindowDays
   isActive.value = automation.active !== false
   sourceDrafts.value = sourceDraftsFromAutomation(automation)
   handoffSavedRun.value = automation.savedRun ?? handoffSavedRun.value
@@ -1538,9 +1545,11 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   cron.syncFromExpression(scheduleExpr.value)
   relativeWindowTypeEnumId.value = draft.relativeWindowTypeEnumId ?? relativeWindowTypeEnumId.value
   relativeWindowCount.value = draft.relativeWindowCount ?? relativeWindowCount.value
-  customWindowStartDate.value = draft.customWindowStartDate?.slice(0, 10) ?? ''
-  customWindowEndDate.value = draft.customWindowEndDate ? previousDateValue(draft.customWindowEndDate) : ''
   windowTimeZone.value = normalizeTimezoneId(draft.windowTimeZone)
+  customWindowStartDate.value = customWindowDay(draft.customWindowStartDate, 0)
+  customWindowEndDate.value = customWindowDay(draft.customWindowEndDate, -1)
+  maxWindowDays.value = draft.maxWindowDays
+  splitWindowDays.value = draft.splitWindowDays
   isActive.value = draft.isActive ?? true
   returnLabel.value = draft.returnLabel ?? ''
   returnPath.value = draft.returnPath ?? ''
