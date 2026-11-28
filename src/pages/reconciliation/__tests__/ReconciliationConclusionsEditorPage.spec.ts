@@ -423,6 +423,30 @@ describe('ReconciliationConclusionsEditorPage', () => {
     expect(rows(wrapper)[1]!.get('[data-testid="conclusions-editor-name"]').text()).toBe('Shipped, not billed')
   })
 
+  // A tree broken by a data load: the orphan shows (it was dropped, and the next save erased it), says why, and save
+  // waits until the person deletes it.
+  it('shows a stored conclusion whose parent is gone, says why, and saves only once it is deleted', async () => {
+    const stored = loadedConclusions()
+    stored.conclusions.push({ ...stored.conclusions[1]!, key: '30', parent: '99', bucket: null, outcome: null })
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: stored })
+    saveRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    const wrapper = await mountPage()
+
+    expect(rows(wrapper)).toHaveLength(3)
+    expect(wrapper.get('[data-testid="conclusions-editor-tree-problem"]').text())
+      .toBe('Conclusion 3, Backordered in NetSuite, hangs off a conclusion that is not here. Delete it to save.')
+    expect(wrapper.find('[data-testid="conclusions-save-blocked"]').exists()).toBe(true)
+
+    await rows(wrapper)[2]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="conclusions-editor-delete"]').trigger('click')
+    expect(wrapper.find('[data-testid="conclusions-editor-tree-problem"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="conclusions-editor-save"]').trigger('click')
+    await flushPromises()
+
+    const [, payload] = saveRunConclusions.mock.calls[0] as [string, Array<{ key: string }>]
+    expect(payload.map((node) => node.key)).toEqual(['10', '20'])
+  })
+
   it('cancel puts the list back', async () => {
     const wrapper = await mountPage()
     await rows(wrapper)[0]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')

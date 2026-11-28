@@ -1,5 +1,5 @@
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type InjectionKey, type Ref } from 'vue'
-import { ApiCallError, isAbortError } from '../lib/api/client'
+import { isAbortError, serviceErrors } from '../lib/api/client'
 import { runConclusionFacade } from '../lib/api/authoringFacade'
 import type {
   ConclusionBucket,
@@ -17,6 +17,8 @@ import {
   explainsLabel,
   flattenConclusionTree,
   withCheckLabel,
+  type ConclusionTreeProblem,
+  type FlatConclusion,
   type LineContext,
 } from '../lib/conclusionLines'
 
@@ -45,6 +47,8 @@ export interface ConclusionDraft {
   outcome: '' | 'HIDE' | 'EXPECTED'
   /** Read only: a filter the brain suggests for these rows. Not sent; the service keeps it with its rule. */
   suggestsFilter: boolean
+  /** A stored node the tree cannot place (see flattenConclusionTree): shown, and save waits until it is deleted. */
+  problem?: ConclusionTreeProblem | null
   lines: DraftLine[]
 }
 
@@ -67,18 +71,14 @@ interface Snapshot {
 
 const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
 const OUTCOME_LABELS: Record<string, string> = { '': 'Shown', HIDE: 'Hidden', EXPECTED: 'Expected' }
+const PROBLEM_WORDS: Record<ConclusionTreeProblem, string> = {
+  ORPHAN: 'hangs off a conclusion that is not here',
+  CYCLE: 'is its own ancestor',
+  DUPLICATE_KEY: 'repeats another conclusion\'s key',
+}
 
 export function outcomeLabel(outcome: string): string {
   return OUTCOME_LABELS[outcome] ?? outcome
-}
-
-function serviceErrors(error: unknown, fallback: string): string[] {
-  if (error instanceof ApiCallError) {
-    const result = (error.details as { result?: { errors?: unknown } } | undefined)?.result
-    const listed = Array.isArray(result?.errors) ? result.errors.map((item) => String(item)).filter(Boolean) : []
-    return listed.length ? listed : [error.message]
-  }
-  return [fallback]
 }
 
 function cloneCondition(condition: RunConclusionCondition): RunConclusionCondition {
@@ -173,8 +173,17 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   const dirty = computed(() => loaded.value
     && (unexplained.value !== snapshot.value.unexplained || !sameList(list.value, snapshot.value.list)))
 
-  /** A conclusion with no name or no line, or a line missing its field or values, cannot be saved (the service needs a line). */
-  const incomplete = computed(() => list.value.some((node) => !node.conclusion
+  /** One line per stored conclusion the tree cannot place, naming it by its rank. */
+  const treeProblems = computed(() => list.value.flatMap((node, index) => (node.problem
+    ? [`Conclusion ${index + 1}, ${conclusionLabel(node) || 'unnamed'}, ${PROBLEM_WORDS[node.problem]}. Delete it to save.`]
+    : [])))
+
+  /**
+   * A conclusion with no name or no line, or a line missing its field or values, cannot be saved (the service needs a
+   * line); nor can a list holding a conclusion the tree cannot place, since saving it as a root would change what it matches.
+   */
+  const incomplete = computed(() => list.value.some((node) => node.problem
+    || !node.conclusion
     || !node.lines.length
     || node.lines.some((line) => conditionIncomplete(line.condition))))
 
@@ -232,7 +241,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     }
   }
 
-  function toDraft(node: RunConclusionNode): ConclusionDraft {
+  function toDraft(node: FlatConclusion): ConclusionDraft {
     return {
       uid: nextUid('c'),
       key: String(node.key),
@@ -242,6 +251,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
       fix: node.fix ?? null,
       outcome: toOutcome(node.outcome),
       suggestsFilter: Boolean(node.suggestedFilterJson?.trim()),
+      problem: node.problem ?? null,
       lines: (node.conditions ?? []).map((condition) => ({
         uid: nextUid('l'),
         condition: cloneCondition(condition),
@@ -281,6 +291,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
       fix: null,
       outcome: '',
       suggestsFilter: false,
+      problem: null,
       lines: [{ uid: nextUid('l'), condition: blankCondition(), loaded: null }],
     }
     list.value.push(node)
@@ -305,7 +316,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     list.value = next
   }
 
-  function updateConclusion(uid: string, patch: Partial<Omit<ConclusionDraft, 'uid' | 'lines' | 'suggestsFilter'>>): void {
+  function updateConclusion(uid: string, patch: Partial<Omit<ConclusionDraft, 'uid' | 'lines' | 'suggestsFilter' | 'problem'>>): void {
     if (saving.value) return
     const node = find(uid)
     if (node) Object.assign(node, patch)
@@ -485,6 +496,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     lookups,
     dirty,
     incomplete,
+    treeProblems,
     lineContext,
     catalogOptions,
     bucketOptions,

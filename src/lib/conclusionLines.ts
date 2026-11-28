@@ -113,18 +113,50 @@ export function explainsLabel(bucket: string | null | undefined, ctx: LineContex
   }
 }
 
-export function flattenConclusionTree(nodes: RunConclusionNode[]): RunConclusionNode[] {
+/**
+ * Why a stored node cannot be placed in the tree: its parent key is missing, its parents form a cycle, or another node
+ * already has its key. Only a data load can store one (save#RunConclusions refuses all three).
+ */
+export type ConclusionTreeProblem = 'ORPHAN' | 'CYCLE' | 'DUPLICATE_KEY'
+export type FlatConclusion = RunConclusionNode & { problem?: ConclusionTreeProblem }
+
+/**
+ * The tree as a flat ranked list: each child above its parent, carrying its ancestors' lines and its root's check. Every
+ * node is placed exactly once, because the save sends the whole list and would erase one left out. A node no root
+ * reaches comes after the rest, with its subtree, flagged with the reason.
+ */
+export function flattenConclusionTree(nodes: RunConclusionNode[]): FlatConclusion[] {
+  const byKey = new Map<string, RunConclusionNode>()
+  const repeats = new Set<RunConclusionNode>()
   const children = new Map<string, RunConclusionNode[]>()
   for (const n of nodes) {
+    if (byKey.has(n.key)) repeats.add(n)
+    else byKey.set(n.key, n)
     if (n.parent) children.set(n.parent, [...(children.get(n.parent) ?? []), n])
   }
-  const out: RunConclusionNode[] = []
-  const walk = (n: RunConclusionNode, inherited: RunConclusionCondition[], bucket: RunConclusionNode['bucket']) => {
+  const placed = new Set<RunConclusionNode>()
+  const out: FlatConclusion[] = []
+  const walk = (n: RunConclusionNode, inherited: RunConclusionCondition[], bucket: RunConclusionNode['bucket'], cut?: ConclusionTreeProblem) => {
+    placed.add(n)
     const conditions = [...inherited, ...n.conditions]
-    for (const k of children.get(n.key) ?? []) walk(k, conditions, bucket)
-    out.push({ ...n, parent: null, bucket, conditions })
+    for (const k of children.get(n.key) ?? []) if (!placed.has(k)) walk(k, conditions, bucket, cut)
+    const problem = cut ?? (repeats.has(n) ? 'DUPLICATE_KEY' : undefined)
+    out.push({ ...n, parent: null, bucket, conditions, ...(problem ? { problem } : {}) })
   }
-  for (const root of nodes.filter((n) => !n.parent)) walk(root, [], root.bucket)
+  for (const root of nodes) if (!root.parent && !placed.has(root)) walk(root, [], root.bucket)
+  // What no root reached: climb to the top of its chain, a node whose parent is missing or the node a cycle comes back to.
+  for (const n of nodes) {
+    if (placed.has(n)) continue
+    const climbed = new Set<RunConclusionNode>()
+    let top = n
+    let parent = top.parent ? byKey.get(top.parent) : undefined
+    while (parent && !climbed.has(parent) && !placed.has(parent)) {
+      climbed.add(top)
+      top = parent
+      parent = top.parent ? byKey.get(top.parent) : undefined
+    }
+    walk(top, [], top.bucket, parent ? 'CYCLE' : 'ORPHAN')
+  }
   return out
 }
 

@@ -216,5 +216,32 @@ describe('flattenConclusionTree', () => {
       labels.forEach((l, i) => (facts[l] = Boolean(m & (1 << i))))
       expect(flatFirstMatch(rows, facts)).toBe(treeFirstMatch(tree, facts))
     }
+    expect(rows.some((r) => r.problem)).toBe(false)
+  })
+
+  // A save sends the whole list, so a stored node the flat list leaves out is erased by the next save. Every node is
+  // placed exactly once; one no root reaches is flagged, never dropped.
+  it('places a node whose parent is missing, with its subtree, flagged as an orphan', () => {
+    const rows = flattenConclusionTree([...tree, node('C3', 'GONE', 'f'), node('G3', 'C3', 'g')])
+    expect(rows.map((r) => r.key)).toEqual(['G1', 'C1', 'C2', 'R1', 'R2', 'G3', 'C3'])
+    expect(rows.filter((r) => r.problem).map((r) => [r.key, r.problem])).toEqual([['G3', 'ORPHAN'], ['C3', 'ORPHAN']])
+    expect(rows.find((r) => r.key === 'G3')?.conditions.map((x) => x.checkLabel)).toEqual(['f', 'g'])
+  })
+
+  it('places every node of a parent cycle once, flagged as a cycle, whatever order they arrive in', () => {
+    const cycle = [node('B', 'A', 'b'), node('A', 'B', 'a'), node('D', 'A', 'd')]
+    for (const nodes of [cycle, [...cycle].reverse()]) {
+      const rows = flattenConclusionTree([...tree, ...nodes])
+      expect(rows).toHaveLength(tree.length + 3)
+      expect(new Set(rows.map((r) => r.key))).toEqual(new Set(['G1', 'C1', 'C2', 'R1', 'R2', 'A', 'B', 'D']))
+      expect(rows.filter((r) => r.problem).every((r) => r.problem === 'CYCLE')).toBe(true)
+      expect(rows.filter((r) => r.problem)).toHaveLength(3)
+    }
+  })
+
+  it('shows a repeated key\'s children once and flags the repeat', () => {
+    const rows = flattenConclusionTree([node('R1', null, 'a'), node('C1', 'R1', 'b'), node('R1', null, 'z')])
+    expect(rows.map((r) => r.key)).toEqual(['C1', 'R1', 'R1'])
+    expect(rows.map((r) => r.problem ?? null)).toEqual([null, null, 'DUPLICATE_KEY'])
   })
 })

@@ -354,6 +354,30 @@ describe('useRunConclusions', () => {
     expect(kept.bucketOptions.value).toContainEqual({ value: 'FINDING', label: 'every finding (single-sided only)' })
   })
 
+  // A tree broken outside the app (a data load) would be erased or silently broadened by the all-or-nothing save.
+  it('a stored conclusion no root reaches shows, says why, and blocks save until it is deleted', async () => {
+    const orphan: RunConclusionNode = {
+      key: '50', parent: '30', conclusion: 'CONC_SCREENED', label: 'Screened out', bucket: null, question: null, outcome: null,
+      conditions: [NO_ORDER_LINE],
+    }
+    const state = await setup(tree({ conclusions: [...tree().conclusions, orphan] }))
+
+    expect(state.list.value.map((node) => [node.key, node.problem])).toEqual([
+      ['20', null], ['10', null], ['40', null], ['50', 'ORPHAN'],
+    ])
+    expect(state.treeProblems.value).toEqual(['Conclusion 4, Screened out, hangs off a conclusion that is not here. Delete it to save.'])
+    expect(state.incomplete.value).toBe(true)
+    await expect(state.save()).resolves.toBe(false)
+    expect(saveConclusions).not.toHaveBeenCalled()
+
+    state.removeConclusion(state.list.value[3]!.uid)
+    expect(state.treeProblems.value).toEqual([])
+    expect(state.incomplete.value).toBe(false)
+    savedOk()
+    await expect(state.save()).resolves.toBe(true)
+    expect(sent().map((node) => node.key)).toEqual(['20', '10', '40'])
+  })
+
   it('the run\'s many lookups word their lines as lists', async () => {
     const state = await setup(tree({
       lookups: [{ name: 'returns', subject: 'FILE_2', many: true }, { name: 'orderInNetsuite', subject: 'FILE_2' }],

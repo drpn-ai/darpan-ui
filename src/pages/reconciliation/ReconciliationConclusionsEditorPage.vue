@@ -25,6 +25,13 @@
         :message="message"
         data-testid="conclusions-editor-error"
       />
+      <InlineValidation
+        v-for="message in treeProblems"
+        :key="message"
+        tone="error"
+        :message="message"
+        data-testid="conclusions-editor-tree-problem"
+      />
 
       <div v-if="loaded" class="conclusions-editor__list" data-testid="conclusions-editor-list">
         <section
@@ -567,6 +574,7 @@ const {
   unexplained,
   dirty,
   incomplete,
+  treeProblems,
   lineContext,
   catalogOptions,
   bucketOptions,
