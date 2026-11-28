@@ -56,7 +56,8 @@ const options: AuditCheckOptions = {
       conclusions: [{ code: 'STALE', label: 'Stale' }],
     },
   ],
-  diffTypes: ['MISSING_IN_FILE_1', 'MISSING_IN_FILE_2', 'FIELD_MISMATCH', 'FINDING', 'DUPLICATE_IN_FILE_1', 'DUPLICATE_IN_FILE_2'],
+  diffTypes: ['MISSING_IN_FILE_1', 'MISSING_IN_FILE_2', 'FIELD_MISMATCH', 'FINDING', 'DUPLICATE_IN_FILE_1', 'DUPLICATE_IN_FILE_2',
+    'DUPLICATE_IN_FILE_1_PAIRED', 'DUPLICATE_IN_FILE_2_PAIRED'],
   fixWhere: ['OMS', 'NETSUITE', 'SHOPIFY'],
   checks: [{ id: 'returns-credited', label: 'Returns credited' }],
 }
@@ -164,6 +165,18 @@ describe('AuditCheckEditor', () => {
     await id.setValue('returns-missing')
     await trigger(w, 'audit-check-label').setValue('Returns missing from NetSuite')
     expect((id.element as HTMLInputElement).value).toBe('returns-missing')
+  })
+
+  // DAR-OPS-029 S12 (OC14, Aditi D5/D7): a repeated key's partner row is named by the side that repeats the key.
+  it('offers a compare run\'s partner rows, each named by the side that repeats the key', async () => {
+    const w = await mountEditor()
+    await pick(w, 'audit-check-run', 'RUN_C')
+    const button = trigger(w, 'audit-check-diff-types-0')
+    await button.trigger('click')
+    const label = (value: string) => (button.element.parentElement as HTMLElement)
+      .querySelector(`[data-option-value="${value}"]`)?.textContent?.trim()
+    expect(label('DUPLICATE_IN_FILE_1_PAIRED')).toBe('Partner of a key repeated in HotWax')
+    expect(label('DUPLICATE_IN_FILE_2_PAIRED')).toBe('Partner of a key repeated in Shopify')
   })
 
   it('hides file 2 and offers only findings and file-1 duplicates for an EVALUATE run', async () => {

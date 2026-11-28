@@ -312,6 +312,9 @@ const DIFF_TYPE_LABELS: Record<AuditDiffType, (side: (s: 'FILE_1' | 'FILE_2') =>
   FINDING: () => 'Finding',
   DUPLICATE_IN_FILE_1: (side) => `Duplicate in ${side('FILE_1')}`,
   DUPLICATE_IN_FILE_2: (side) => `Duplicate in ${side('FILE_2')}`,
+  // A partner row is the one record on its side for a key the other side repeats: named by the side that repeats it.
+  DUPLICATE_IN_FILE_1_PAIRED: (side) => `Partner of a key repeated in ${side('FILE_2')}`,
+  DUPLICATE_IN_FILE_2_PAIRED: (side) => `Partner of a key repeated in ${side('FILE_1')}`,
 }
 // An EVALUATE run reads one side, so only its findings and its duplicates can break a statement.
 const EVALUATE_DIFF_TYPES: AuditDiffType[] = ['FINDING', 'DUPLICATE_IN_FILE_1']

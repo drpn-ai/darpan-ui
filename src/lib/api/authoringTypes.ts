@@ -179,6 +179,9 @@ export type AuditDiffType =
   | 'FINDING'
   | 'DUPLICATE_IN_FILE_1'
   | 'DUPLICATE_IN_FILE_2'
+  // DAR-OPS-029 S12 (OC14, Aditi D5/D7): the side-y partner record of a key repeated on the other side.
+  | 'DUPLICATE_IN_FILE_1_PAIRED'
+  | 'DUPLICATE_IN_FILE_2_PAIRED'
 
 /** Which of the run's rows break one statement: blank lists = any; a row whose cause is expected never does (DAR-BE-196). */
 export interface AuditCheckStatementLink {
