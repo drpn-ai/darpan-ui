@@ -168,9 +168,10 @@
 </template>
 
 <script setup lang="ts">
+import { useSavedRunEditor } from '../../composables/useSavedRunEditor'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
@@ -203,7 +204,6 @@ import {
   buildReconciliationOutputRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
-import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 
@@ -233,15 +233,14 @@ interface RunningRunView {
 }
 
 const route = useRoute()
-const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const runResultsStore = useRunResultsStore()
 const loading = ref(false)
 const loadingMore = ref(false)
 const loadError = ref<string | null>(null)
-const openingRunSettings = ref(false)
-const runSettingsError = ref<string | null>(null)
+// S99-110: resolve the saved run, set its draft, open its editor (shared with Run Result and the Diff page).
+const { opening: openingRunSettings, error: runSettingsError, openById: openSavedRunEditor } = useSavedRunEditor('Run History')
 const editableRunName = ref('')
 const persistedRunName = ref('')
 const savingRunName = ref(false)
@@ -346,31 +345,8 @@ function buildResultRoute(output: GeneratedOutput) {
 }
 
 async function openRunSettings(): Promise<void> {
-  const targetId = savedRunId.value
-  if (!canOpenRunSettings.value || !targetId || openingRunSettings.value) return
-
-  openingRunSettings.value = true
-  runSettingsError.value = null
-
-  try {
-    draftStore.setWorkflowOrigin('Run History', route.fullPath)
-    const savedRun = await resolveSavedRunEditorTarget(targetId)
-    if (!savedRun) {
-      runSettingsError.value = `Run "${targetId}" ran away. Fittingly.`
-      return
-    }
-
-    if (savedRun.runType === 'ruleset') {
-      const draft = buildRuleSetDraft(savedRun)
-      if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
-    }
-
-    await router.push(buildSavedRunEditorRoute(savedRun))
-  } catch (error) {
-    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Run settings are behind a door marked pull. We pushed.'
-  } finally {
-    openingRunSettings.value = false
-  }
+  if (!canOpenRunSettings.value) return
+  await openSavedRunEditor(savedRunId.value)
 }
 
 function firstText(...values: unknown[]): string {

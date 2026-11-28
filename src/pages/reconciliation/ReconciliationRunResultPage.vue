@@ -538,6 +538,7 @@
 </template>
 
 <script setup lang="ts">
+import { useSavedRunEditor } from '../../composables/useSavedRunEditor'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
@@ -586,7 +587,7 @@ import {
   shortRunQuery,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
-import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget, savedRunSystemLabel } from '../../lib/savedRunEditorRoute'
+import { resolveSavedRunEditorTarget, savedRunSystemLabel } from '../../lib/savedRunEditorRoute'
 import { formatClockTime, formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -633,8 +634,8 @@ const draftStore = useReconciliationDraftStore()
 const permissionsStore = usePermissionsStore()
 const loading = ref(false)
 const loadError = ref<string | null>(null)
-const openingRunSettings = ref(false)
-const runSettingsError = ref<string | null>(null)
+// S99-110: resolve the saved run, set its draft, open its editor (shared with Run History and the Diff page).
+const { opening: openingRunSettings, error: runSettingsError, openById: openSavedRunEditor } = useSavedRunEditor('Run Result')
 // S99-111: what this page reads of a saved result; the summary read gives no more, so nothing else is made up.
 type SavedResultView = Pick<GeneratedOutput,
   'savedRunId' | 'savedRunName' | 'ruleSetId' | 'reconciliationMappingId' | 'file1Label' | 'file2Label' | 'totalDifferences' | 'createdDate'>
@@ -1091,34 +1092,8 @@ function openRulesBoardWithExclusion(question: RunConclusionQuestion): Promise<v
 }
 
 async function openRunEditor(pendingExclusion: RunConclusionSuggestedFilter | null): Promise<void> {
-  const targetId = runSettingsId.value
-  if (!canOpenRunSettings.value || !targetId || openingRunSettings.value) return
-
-  openingRunSettings.value = true
-  runSettingsError.value = null
-
-  try {
-    draftStore.setWorkflowOrigin('Run Result', route.fullPath)
-    const savedRun = await resolveSavedRunEditorTarget(targetId)
-    if (!savedRun) {
-      runSettingsError.value = `Run "${targetId}" ran away. Fittingly.`
-      return
-    }
-
-    const draft = savedRun.runType === 'ruleset' ? buildRuleSetDraft(savedRun) : null
-    if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
-
-    if (draft && pendingExclusion) {
-      draftStore.setPendingExclusion(pendingExclusion)
-      await router.push({ name: 'reconciliation-ruleset-editor' })
-      return
-    }
-    await router.push(buildSavedRunEditorRoute(savedRun))
-  } catch (error) {
-    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Run settings are behind a door marked pull. We pushed.'
-  } finally {
-    openingRunSettings.value = false
-  }
+  if (!canOpenRunSettings.value) return
+  await openSavedRunEditor(runSettingsId.value, pendingExclusion)
 }
 
 function resetDiffDetailsState(): void {
