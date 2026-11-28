@@ -8,24 +8,8 @@
       <span v-if="labelText" class="json-collapse-viewer__key">{{ labelText }}</span><span>{{ emptyToken }}</span><span v-if="!isLast">,</span>
     </div>
 
-    <div
-      v-else-if="collapsed"
-      class="json-collapse-viewer__line"
-      :style="lineStyle"
-    >
-      <button
-        type="button"
-        class="json-collapse-viewer__toggle"
-        data-testid="json-collapse-toggle"
-        :aria-label="toggleLabel"
-        aria-expanded="false"
-        @click="collapsed = false"
-      >
-        <span class="json-collapse-viewer__caret" aria-hidden="true"></span>
-      </button><span v-if="labelText" class="json-collapse-viewer__key">{{ labelText }}</span><span>{{ openToken }}</span><span class="json-collapse-viewer__ellipsis"> ... </span><span>{{ closeToken }}</span><span class="json-collapse-viewer__summary"> {{ summaryText }}</span><span v-if="!isLast">,</span>
-    </div>
-
     <template v-else>
+      <!-- One toggle for both states, so a keyboard press never removes the button that has the focus. -->
       <div
         class="json-collapse-viewer__line"
         :style="lineStyle"
@@ -35,29 +19,31 @@
           class="json-collapse-viewer__toggle"
           data-testid="json-collapse-toggle"
           :aria-label="toggleLabel"
-          aria-expanded="true"
-          @click="collapsed = true"
+          :aria-expanded="collapsed ? 'false' : 'true'"
+          @click="collapsed = !collapsed"
         >
-          <span class="json-collapse-viewer__caret json-collapse-viewer__caret--expanded" aria-hidden="true"></span>
-        </button><span v-if="labelText" class="json-collapse-viewer__key">{{ labelText }}</span><span>{{ openToken }}</span>
+          <span class="json-collapse-viewer__caret" :class="{ 'json-collapse-viewer__caret--expanded': !collapsed }" aria-hidden="true"></span>
+        </button><span v-if="labelText" class="json-collapse-viewer__key">{{ labelText }}</span><span>{{ openToken }}</span><template v-if="collapsed"><span class="json-collapse-viewer__ellipsis"> ... </span><span>{{ closeToken }}</span><span class="json-collapse-viewer__summary"> {{ summaryText }}</span><span v-if="!isLast">,</span></template>
       </div>
 
-      <JsonCollapseNode
-        v-for="entry in containerEntries"
-        :key="entry.key"
-        :value="entry.value"
-        :label="entry.label"
-        :node-name="entry.nodeName"
-        :depth="depth + 1"
-        :is-last="entry.isLast"
-      />
+      <template v-if="!collapsed">
+        <JsonCollapseNode
+          v-for="entry in containerEntries"
+          :key="entry.key"
+          :value="entry.value"
+          :label="entry.label"
+          :node-name="entry.nodeName"
+          :depth="depth + 1"
+          :is-last="entry.isLast"
+        />
 
-      <div
-        class="json-collapse-viewer__line"
-        :style="lineStyle"
-      >
-        <span>{{ closeToken }}</span><span v-if="!isLast">,</span>
-      </div>
+        <div
+          class="json-collapse-viewer__line"
+          :style="lineStyle"
+        >
+          <span>{{ closeToken }}</span><span v-if="!isLast">,</span>
+        </div>
+      </template>
     </template>
   </div>
 
@@ -181,10 +167,7 @@ function formatPrimitive(value: unknown): string {
   justify-content: center;
   width: 1rem;
   min-height: 1rem;
-  /* 0.2rem sits below --space-1 (0.4rem); the scale has no step under it, so folding would double
-     this gap on a control that sits inline with JSON text. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  margin: 0 0.2rem 0 0;
+  margin: 0 var(--space-00) 0 0;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
