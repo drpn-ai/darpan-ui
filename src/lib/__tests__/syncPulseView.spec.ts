@@ -77,7 +77,7 @@ describe('periodPulseMinutes', () => {
 })
 
 describe('buildSyncPulseView', () => {
-  // GORJANA: 100102 pulses hourly; 100000 only in peak periods; 100001 and the month-close pairs only carry the allowance.
+  // GORJANA: 100102 pulses hourly; 100000 only in the periods that turn it on; 100001 and the month-close pairs only carry the allowance.
   const pairs = [
     pair({ syncPairId: '100000', automationId: '100518', automationName: 'Daily Order Reconciliation - NetSuite', waitingCount: 4, pastAllowanceCount: 12 }),
     pair({ syncPairId: '100001', automationId: '100520', automationName: 'Daily Return Reconciliation - NetSuite' }),
@@ -85,18 +85,28 @@ describe('buildSyncPulseView', () => {
     pair({ syncPairId: '100102', automationId: '100102', label: 'Shopify → HotWax orders', automationName: 'Daily Order Reconciliation', pulseEveryMinutes: 60 }),
   ]
 
+  const next = new Map([['100000', { periodName: 'PEAK Nov 27', fromDate: '2026-11-27', allowanceMinutes: 360 }]])
+
   it('splits pulsing pairs from allowance-only pairs', () => {
-    const view = buildSyncPulseView(pairs, automations, new Map([['100000', 60]]))
+    const view = buildSyncPulseView(pairs, automations, new Map([['100000', 60]]), new Map())
     expect(view.pulsing.map((r) => r.syncPairId)).toEqual(['100000', '100102'])
     expect(view.allowanceOnly.map((r) => r.syncPairId)).toEqual(['100001', '100053'])
     expect(view.pulsing[0]).toMatchObject({ label: 'HotWax → NetSuite', checkName: 'Daily Order Reconciliation - NetSuite',
-      cadence: 'Every 1h in peak periods', counts: '4 waiting · 12 past' })
+      cadence: 'Every 1h today', counts: '4 waiting · 12 past' })
     expect(view.pulsing[1]).toMatchObject({ label: 'Shopify → HotWax', cadence: 'Every 1h' })
     expect(view.allowanceOnly[0]).toMatchObject({ label: 'HotWax → NetSuite returns', cadence: 'Off' })
   })
 
+  // Pulses run only on the days a period turns them on (Aditi 2026-11-26): a pulse no period runs today says when it
+  // next does, in the Pulses page's words, and never "in peak periods", which reads as every period (Sale included).
+  it('words a pulse only a coming period turns on as off today, with its next day', () => {
+    const view = buildSyncPulseView(pairs, automations, new Map(), next)
+    expect(view.pulsing[0]).toMatchObject({ syncPairId: '100000', cadence: 'Off today · next: 27 Nov' })
+    for (const row of [...view.pulsing, ...view.allowanceOnly]) expect(row.cadence).not.toMatch(/peak period|PEAK|Sale/)
+  })
+
   it('puts a period-only pulser with the allowance-only pairs when no live period turns it on', () => {
-    const view = buildSyncPulseView(pairs, automations, new Map())
+    const view = buildSyncPulseView(pairs, automations, new Map(), new Map())
     expect(view.pulsing.map((r) => r.syncPairId)).toEqual(['100102'])
   })
 
@@ -104,26 +114,28 @@ describe('buildSyncPulseView', () => {
     const stores = ['Canada', 'EU', 'Outlet', 'UK', 'USA'].map((store, i) => pair({ syncPairId: `10015${4 + i}`, automationId: `S${i}`,
       label: 'Shopify → HotWax orders', automationName: `Daily Order Reconciliation ${store}`, pulseEveryMinutes: 60 }))
     const netsuite = pair({ syncPairId: '100160', automationName: 'Daily Order Reconciliation - NetSuite', pulseEveryMinutes: 60 })
-    const view = buildSyncPulseView([netsuite, ...stores], [], new Map())
+    const view = buildSyncPulseView([netsuite, ...stores], [], new Map(), new Map())
     expect(view.pulsing.map((r) => r.label)).toEqual(['HotWax → NetSuite', 'Shopify Canada → HotWax', 'Shopify EU → HotWax',
       'Shopify Outlet → HotWax', 'Shopify UK → HotWax', 'Shopify USA → HotWax'])
   })
 
   it('leaves look-alike allowance-only pairs as they are, and a lone pulse with its plain label', () => {
-    const view = buildSyncPulseView(pairs, automations, new Map([['100000', 60]]))
+    const view = buildSyncPulseView(pairs, automations, new Map([['100000', 60]]), new Map())
     expect(view.pulsing.map((r) => r.label)).toEqual(['HotWax → NetSuite', 'Shopify → HotWax'])
   })
 
   // DAR-UI-159: a count, not the first pair and "N more"; the cadence only when every pulsing pair shares it.
   it('counts the pulsing pairs on the Tenant Settings row, "None" when nothing pulses', () => {
-    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map([['100000', 60]])))).toBe('2 pairs')
-    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map()))).toBe('1 pair · every 1h')
-    expect(syncPulseSettingsValue(buildSyncPulseView([pairs[1]!], automations, new Map()))).toBe('None')
+    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map([['100000', 60]]), new Map()))).toBe('2 pairs')
+    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map(), new Map()))).toBe('1 pair · every 1h')
+    expect(syncPulseSettingsValue(buildSyncPulseView([pairs[1]!], automations, new Map(), new Map()))).toBe('None')
+    // Only its first letter drops to lower case: the month keeps its capital.
+    expect(syncPulseSettingsValue(buildSyncPulseView([pairs[0]!], automations, new Map(), next))).toBe('1 pair · off today · next: 27 Nov')
   })
 
   it('gives the shared cadence when every pulsing pair has the same one (RAILS: six hourly pulses)', () => {
     const six = ['A', 'B', 'C', 'D', 'E', 'F'].map((k, i) => pair({ syncPairId: `20000${i}`, automationId: k, pulseEveryMinutes: 60 }))
-    expect(syncPulseSettingsValue(buildSyncPulseView(six, [], new Map()))).toBe('6 pairs · every 1h')
+    expect(syncPulseSettingsValue(buildSyncPulseView(six, [], new Map(), new Map()))).toBe('6 pairs · every 1h')
   })
 })
 

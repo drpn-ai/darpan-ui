@@ -13,7 +13,7 @@ export interface SyncPulseRow {
   label: string
   /** The check the pair belongs to. */
   checkName: string
-  /** "Every 1h", "Every 1h in peak periods", or "Off". */
+  /** "Every 1h" (its own pulse), "Every 1h today" (a period on today), "Off today · next: 27 Nov", or "Off". */
   cadence: string
   counts: string
   pulses: boolean
@@ -70,7 +70,7 @@ export function plainPairLabel(label: string): string {
   return systems.target === 'Target' ? `${systems.up} only` : `${systems.up} → ${systems.target}`
 }
 
-/** The pairs that pulse in a peak period that has not ended, from each period's sync rows. */
+/** By pair, the most frequent pulse the given periods' sync rows turn on (loadSyncPulseView passes the ones on today). */
 export function periodPulseMinutes(periodRows: PeakSyncRow[][]): Map<string, number> {
   const out = new Map<string, number>()
   for (const rows of periodRows) {
@@ -152,15 +152,25 @@ function tellApart(rows: SyncPulseRow[]): SyncPulseRow[] {
   })
 }
 
-/** Pairs that pulse (normally, or in a coming or current peak period) first; the allowance-only pairs apart. */
+/**
+ * A pair's cadence in words. Pulses run only on the days a period turns them on (Aditi 2026-11-26), so a pulse that only
+ * periods run says today's cadence or the next day it runs, as the Pulses page does; never "in peak periods", which
+ * reads as every period, a Sale with its pulses off included.
+ */
+function cadenceWords(own: number | null | undefined, today: number | undefined, next: NextPulse | undefined): string {
+  if (own) return pulseCadence(own)
+  if (today !== undefined) return `${pulseCadence(today)} today`
+  return next ? `Off today · next: ${calendarDayWords(next.fromDate)}` : pulseCadence(null)
+}
+
+/** Pairs that pulse (on their own, in a period on today, or in a coming one) first; the allowance-only pairs apart. */
 export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAutomationOption[],
-  periodPulse: Map<string, number>): SyncPulseView {
+  todayPulse: Map<string, number>, nextPulse: Map<string, NextPulse>): SyncPulseView {
   const rows = pairs.map((pair): SyncPulseRow => {
-    const inPeriods = periodPulse.get(pair.syncPairId)
-    const pulses = Boolean(pair.pulseEveryMinutes) || inPeriods !== undefined
-    const cadence = pair.pulseEveryMinutes
-      ? pulseCadence(pair.pulseEveryMinutes)
-      : inPeriods !== undefined ? `${pulseCadence(inPeriods)} in peak periods` : pulseCadence(null)
+    const today = todayPulse.get(pair.syncPairId)
+    const next = nextPulse.get(pair.syncPairId)
+    const pulses = Boolean(pair.pulseEveryMinutes) || today !== undefined || next !== undefined
+    const cadence = cadenceWords(pair.pulseEveryMinutes, today, next)
     return {
       syncPairId: pair.syncPairId,
       label: pairSidesLabel(pair, automations),
@@ -174,15 +184,17 @@ export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAu
 }
 
 /**
- * DAR-UI-159. The Tenant Settings value over the pulsing pairs: "6 pairs · every 1h in peak periods" when they share a
- * cadence, "6 pairs" when not, else "None". It named the first pair and "5 more" of the rest.
+ * DAR-UI-159. The Tenant Settings value over the pulsing pairs: "6 pairs · every 1h today" when they share a cadence,
+ * "6 pairs" when not, else "None". It named the first pair and "5 more" of the rest.
  */
 export function syncPulseSettingsValue(view: SyncPulseView): string {
   const count = view.pulsing.length
   if (!count) return 'None'
   const pairs = count === 1 ? '1 pair' : `${count} pairs`
   const cadences = new Set(view.pulsing.map((row) => row.cadence))
-  return cadences.size === 1 ? `${pairs} · ${view.pulsing[0]!.cadence.toLowerCase()}` : pairs
+  if (cadences.size !== 1) return pairs
+  const cadence = view.pulsing[0]!.cadence
+  return `${pairs} · ${cadence.charAt(0).toLowerCase()}${cadence.slice(1)}`
 }
 
 const LIVE_STATES = new Set<PeakPeriodSummary['state']>(['upcoming', 'on'])
@@ -220,8 +232,10 @@ export async function loadSyncPulseView(signal?: AbortSignal): Promise<LoadedSyn
   const automations = form.status === 'fulfilled' ? form.value : []
   const live = periods.status === 'fulfilled' ? periods.value.live : []
   const rows = periods.status === 'fulfilled' ? periods.value.rows : []
-  return { pairs, view: buildSyncPulseView(pairs, automations, periodPulseMinutes(rows)), periods: live,
-    nextPulse: nextPulsePeriods(live, rows), pulsingPeriodIds: pulsingPeriods(live, rows) }
+  const nextPulse = nextPulsePeriods(live, rows)
+  const todayPulse = periodPulseMinutes(rows.filter((_, i) => live[i]?.state === 'on'))
+  return { pairs, view: buildSyncPulseView(pairs, automations, todayPulse, nextPulse), periods: live,
+    nextPulse, pulsingPeriodIds: pulsingPeriods(live, rows) }
 }
 
 /** "last 18:17", "last pulse skipped 18:17", "last pulse failed 18:17", or "no pulse yet". */

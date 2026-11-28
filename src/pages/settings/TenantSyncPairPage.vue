@@ -339,8 +339,8 @@ type Popup = 'every' | 'allowance' | 'run' | 'upstream' | 'chat' | 'hourly' | 'd
 const REFRESH_MS = 60_000
 const OFF = 'off'
 const NONE = 'none'
-// A new pair starts on the mockup's hourly pulse and six-hour allowance.
-const NEW_PULSE_MINUTES = 60
+// A new pair starts with its own pulse off and a six-hour allowance: pulses run only on the days a peak period turns
+// them on (Aditi 2026-11-26), and the period's sync row sets that pulse.
 const NEW_ALLOWANCE_MINUTES = 360
 
 const route = useRoute()
@@ -564,7 +564,7 @@ function resetDraft(): void {
       }
     : {
         syncPairId: '', automationId: '', upstreamSide: '', allowanceMinutes: NEW_ALLOWANCE_MINUTES,
-        pulseEveryMinutes: NEW_PULSE_MINUTES, chatSpaceId: '', hourlySummary: false, isActive: true,
+        pulseEveryMinutes: null, chatSpaceId: '', hourlySummary: false, isActive: true,
       }
   baseline.value = snapshot()
 }

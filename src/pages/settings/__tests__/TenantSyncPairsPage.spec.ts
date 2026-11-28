@@ -74,7 +74,8 @@ describe('TenantSyncPairsPage', () => {
     expect(rows.map((r) => r.attributes('aria-label'))).toEqual([
       'Open sync pair HotWax → NetSuite', 'Open sync pair Shopify → HotWax'])
     expect(rows[0]!.text()).toContain('Daily Order Reconciliation - NetSuite')
-    expect(rows[0]!.text()).toContain('Every 1h in peak periods')
+    // The Sale period is on today and turns this pulse on.
+    expect(rows[0]!.text()).toContain('Every 1h today')
     const toggle = wrapper.get('[data-testid="sync-allowance-toggle"]')
     expect(toggle.text()).toContain('Start allowance only')
     expect(toggle.text()).toContain('2')

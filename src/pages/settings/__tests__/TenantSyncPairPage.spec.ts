@@ -239,6 +239,16 @@ describe('TenantSyncPairPage', () => {
     expect(saveSyncPair).toHaveBeenCalledWith(expect.objectContaining({ pulseEveryMinutes: null, isActive: false }))
   })
 
+  // OC43: only a NEW pair starts with its pulse off; opening and saving a saved pair sends its own pulse back as stored.
+  it.each([[120, 120], [null, null]])('keeps a saved pair’s own pulse of %s through an open and a save', async (own, sent) => {
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({ pulseEveryMinutes: own, normalPulseEveryMinutes: own }) }))
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="sync-pair-on"]').trigger('click')
+    await wrapper.find('[data-testid="sync-pair-save"]').trigger('click')
+    await flushPromises()
+    expect(saveSyncPair).toHaveBeenCalledWith(expect.objectContaining({ pulseEveryMinutes: sent, isActive: false }))
+  })
+
   it('shows the server’s sentences word for word', async () => {
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="sync-pair-on"]').trigger('click')
@@ -500,6 +510,8 @@ describe('TenantSyncPairPage', () => {
       expect(facts.map((fact) => fact.find('.static-page-summary-label').text()))
         .toEqual(['Run', 'Upstream side', 'Every', 'Allowance', 'Chat space', 'Hourly summary'])
       expect(text(wrapper, 'sync-pair-fact-run')).toContain('Not set')
+      // Pulses run only on the days a peak period turns them on (Aditi 2026-11-26), so a new pair starts with its own off.
+      expect(wrapper.find('[data-testid="sync-pair-fact-every"] .static-fact__value').text()).toBe('Off')
       expect(wrapper.find('[data-testid="sync-pair-fact-upstream"]').attributes('disabled')).toBeDefined()
       expect(wrapper.find('[data-testid="sync-pair-today"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="sync-pair-delete"]').exists()).toBe(false)
@@ -543,7 +555,7 @@ describe('TenantSyncPairPage', () => {
       await wrapper.find('[data-testid="sync-pair-save"]').trigger('click')
       await flushPromises()
       expect(saveSyncPair).toHaveBeenCalledWith({
-        automationId: 'A2', upstreamSide: 'FILE_2', allowanceMinutes: 30, pulseEveryMinutes: 60,
+        automationId: 'A2', upstreamSide: 'FILE_2', allowanceMinutes: 30, pulseEveryMinutes: null,
         chatSpaceId: 'CS2', hourlySummary: true, isActive: true,
       })
       expect(replace).toHaveBeenCalledWith({ name: 'pulse', params: { syncPairId: 'SP9' } })
