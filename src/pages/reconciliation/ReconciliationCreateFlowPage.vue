@@ -229,6 +229,7 @@ const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']
 const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
 const SUITEQL_RECORD_ROOT = '$.records[*].'
 const NEW_QUERY_PATH = '/reconciliation/queries/new'
+const CREATE_FLOW_PATH = '/reconciliation/create'
 // DAR-UI-064. /reconciliation/create?scope=EVALUATE builds one source and no second side: every record it
 // returns is a finding (the gorjana month-close checks). Create a run still asks the kind of run once.
 const SCOPE_EVALUATE = 'EVALUATE'
@@ -911,6 +912,13 @@ const chipPendingValue = ref('')
 // commit the value they can plainly see in the box.
 const hasPendingChipText = computed(() => isChipTextStep.value && chipPendingValue.value.trim().length > 0)
 
+// A side's key is answered once it holds a chip, or while its own key card has text typed but not Entered.
+// Both OK (canProceed) and Save (canCreateRun) read this: on a single-sided run the key card is the Save card.
+function primaryIdAnswered(side: SourceSide): boolean {
+  const committed = side === 'file1' ? file1PrimaryIdExpression.value : file2PrimaryIdExpression.value
+  return committed.length > 0 || (hasPendingChipText.value && currentStep.value.id === `${side}-primary-id`)
+}
+
 // The chip input is remounted per step and starts empty, but a fresh empty ref emits nothing --
 // so without this reset an abandoned value (operator typed, then hit Back) would linger and
 // wrongly satisfy the NEXT chip step.
@@ -1238,7 +1246,7 @@ function wizardReturnPath(): string {
   })
   if (isSingleSided.value && !params.has('scope')) params.set('scope', SCOPE_EVALUATE)
   const query = params.toString()
-  const path = (route as { path?: string }).path || '/reconciliation/create'
+  const path = (route as { path?: string }).path || CREATE_FLOW_PATH
   return query ? `${path}?${query}` : path
 }
 
@@ -1260,7 +1268,7 @@ const canProceed = computed(() => {
       // Required for JSON, skippable for CSV -- a skipped CSV schema falls back to chip text.
       return (file1UsesJson.value ? file1JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
     case 'file1-primary-id':
-      return (file1PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
+      return primaryIdAnswered('file1') && !schemaFieldSelectionError.value
     case 'file1-api-config':
       return file1SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file1-api':
@@ -1279,7 +1287,7 @@ const canProceed = computed(() => {
     case 'file2-schema':
       return (file2UsesJson.value ? file2JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
     case 'file2-primary-id':
-      return (file2PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
+      return primaryIdAnswered('file2') && !schemaFieldSelectionError.value
     case 'file2-api-config':
       return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file2-api':
@@ -1297,10 +1305,10 @@ const canCreateRun = computed(() => {
     trimmedRunName.value.length > 0 &&
     file1SystemEnumId.value.length > 0 &&
     (file1UsesApi.value
-      ? hasApiSourceConfig('file1') && hasApiEndpoint('file1') && file1PrimaryIdExpression.value.length > 0
+      ? hasApiSourceConfig('file1') && hasApiEndpoint('file1') && primaryIdAnswered('file1')
       : file1FileTypeEnumId.value.length > 0 &&
         (!file1UsesJson.value || !!resolveSchemaFileName(file1JsonSchemaId.value)) &&
-        file1PrimaryIdExpression.value.length > 0) &&
+        primaryIdAnswered('file1')) &&
     (isSingleSided.value || canCreateSecondSide())
   )
 })
@@ -1309,10 +1317,10 @@ function canCreateSecondSide(): boolean {
   return (
     file2SystemEnumId.value.length > 0 &&
     (file2UsesApi.value
-      ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && file2PrimaryIdExpression.value.length > 0
+      ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && primaryIdAnswered('file2')
       : file2FileTypeEnumId.value.length > 0 &&
         (!file2UsesJson.value || !!resolveSchemaFileName(file2JsonSchemaId.value)) &&
-        file2PrimaryIdExpression.value.length > 0) &&
+        primaryIdAnswered('file2')) &&
     // DAR-UI-064: both sides may read the same system through different configs (NetSuite warranty claims against
     // NetSuite credit memos); only the very same source twice is refused, as create#RuleSetRun refuses it.
     (file1SystemEnumId.value !== file2SystemEnumId.value || file1SourceConfigId.value.trim() !== file2SourceConfigId.value.trim())
@@ -1849,7 +1857,7 @@ function seedRuleSetBoardDraft(): void {
 async function openCreateDetour(path: string): Promise<void> {
   continuingFlowElsewhere = true
   publishDraftForDetour(currentStep.value.id)
-  draftStore.setWorkflowOrigin('Reconciliation Setup', '/reconciliation/create')
+  draftStore.setWorkflowOrigin('Reconciliation Setup', CREATE_FLOW_PATH)
   await router.push({ path })
 }
 
@@ -2043,6 +2051,17 @@ async function openConfigCreateWorkflow(): Promise<void> {
   await openCreateDetour(target.path)
 }
 
+/**
+ * Where a saved run goes back to. A detour (openCreateDetour) points the origin at this wizard so Esc returns
+ * here, and nothing points it elsewhere again, so an origin that is this wizard leads nowhere: null, and Home.
+ */
+function originOutsideWizard(): string | null {
+  const originPath = draftStore.workflowOrigin?.path
+  if (!originPath) return null
+  const wizardPath = (route as { path?: string }).path || CREATE_FLOW_PATH
+  return originPath.split('?')[0] === wizardPath ? null : originPath
+}
+
 function isAutomationCreateRoute(): boolean {
   const automationFlow = route.query.automationFlow
   return automationFlow === 'new-run' || (Array.isArray(automationFlow) && automationFlow.includes('new-run'))
@@ -2096,8 +2115,7 @@ async function createRun(): Promise<void> {
       return
     }
 
-    const workflowOrigin = draftStore.workflowOrigin
-    await router.push(workflowOrigin?.path ?? { name: 'hub' })
+    await router.push(originOutsideWizard() ?? { name: 'hub' })
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     pageError.value = error instanceof ApiCallError ? error.message : 'The reconciliation flow did not flow. Not created.'

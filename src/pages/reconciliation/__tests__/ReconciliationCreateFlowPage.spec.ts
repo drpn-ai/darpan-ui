@@ -1239,6 +1239,24 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
   })
 
+  // A schema or config detour sets the origin to this wizard (so Esc comes back), and the schema page
+  // saves to its library, so the operator returns with that origin still set. Save must leave the wizard:
+  // a push to the page already showing does nothing, and a second Save makes the same run again.
+  it('leaves the wizard after a save whose origin is the wizard itself', async () => {
+    draftStoreState.workflowOrigin = { label: 'Reconciliation Setup', path: '/reconciliation/create' }
+    draftStoreState.ruleSetDraftState = createDraftState()
+    createRuleSetRun.mockResolvedValue({ ok: true, savedRun: { savedRunId: 'RUN_1', runName: 'JSON Order Compare' } })
+
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(createRuleSetRun).toHaveBeenCalledTimes(1)
+    expect(push).not.toHaveBeenCalledWith('/reconciliation/create')
+    expect(push).toHaveBeenCalledWith({ name: 'hub' })
+  })
+
   it('restores the draft from history state and returns to the workflow origin after creating the run', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
     draftStoreState.ruleSetDraftState = createDraftState()
@@ -2729,6 +2747,22 @@ describe('ReconciliationCreateFlowPage', () => {
         file1PrimaryIdExpression: '$.records[*].tranId',
       }))
       expect(Object.keys(payload).filter((key) => key.startsWith('file2'))).toEqual([])
+    })
+
+    // The key card is the Save card here, so Save must count a typed key as an answer as OK does:
+    // a disabled button takes no click and no focus, so the input never blurs and nothing commits.
+    it('saves a single-sided run from a key typed and never Entered', async () => {
+      mockSideOptions()
+      route.query = { scope: 'EVALUATE' }
+      const wrapper = await startSideFlow('Credit memos left open')
+      await chooseApiConfig(wrapper, 'file1', 'NETSUITE', 'NS_CREDIT_OPEN')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('tranId')
+
+      expect(wrapper.get('[data-testid="create-run-submit"]').attributes('disabled')).toBeUndefined()
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(lastCreatePayload()).toEqual(expect.objectContaining({ file1PrimaryIdExpression: '$.records[*].tranId' }))
     })
   })
 })
