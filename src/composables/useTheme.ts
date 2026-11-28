@@ -16,18 +16,34 @@ function detectSystemTheme(): ThemeMode {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
+// With site data blocked even reading window.localStorage throws, and initTheme runs before the app mounts. A storage
+// that refuses reads as nothing saved and keeps nothing; the theme still applies (as readCache treats its storage).
+function readStoredTheme(): ThemeMode | null {
+  try {
+    return resolveStoredTheme(window.localStorage?.getItem(STORAGE_KEY))
+  } catch {
+    return null
+  }
+}
+
+function storeTheme(mode: ThemeMode): void {
+  try {
+    window.localStorage?.setItem(STORAGE_KEY, mode)
+  } catch {
+    // The choice holds for this visit; it just is not remembered.
+  }
+}
+
 function applyTheme(mode: ThemeMode, persist: boolean): void {
   theme.value = mode
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', mode)
   }
-  if (persist && typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, mode)
-  }
+  if (persist) storeTheme(mode)
 }
 
 export function initTheme(): ThemeMode {
-  const stored = typeof localStorage !== 'undefined' ? resolveStoredTheme(localStorage.getItem(STORAGE_KEY)) : null
+  const stored = typeof window !== 'undefined' ? readStoredTheme() : null
   if (stored) {
     userSelected = true
     applyTheme(stored, true)
