@@ -32,7 +32,7 @@
         <template #header>
           <h2 v-explain="'auditStatements'" class="static-page-section-heading">Statements</h2>
         </template>
-        <ul v-if="settings.statements.length" class="audit-statements">
+        <ul v-if="settings.statements.length" class="audit-statements static-row-list">
           <li
             v-for="statement in settings.statements"
             :key="statement.id"
@@ -989,29 +989,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* The statements as one bordered list of equal rows: the row opens the statement, its level cell opens the level, the
-   switch at its end flips it. */
-.audit-statements {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-  overflow: hidden;
-  font-size: var(--static-tile-text-size);
-}
+/* The statements as one bordered list of equal rows (.static-row-list): the row opens the statement, its level cell
+   opens the level, the switch at its end flips it. */
 
 .audit-statement {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   min-height: 4.4rem;
-}
-
-.audit-statement + .audit-statement {
-  border-top: 1px solid var(--static-tile-border);
 }
 
 .audit-statement__open {

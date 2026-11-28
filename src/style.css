@@ -2450,6 +2450,25 @@ label > span {
   opacity: 1;
 }
 
+/* A bordered list of equal rows: the settings-page rows (DAR-UI-128). RunConclusionRows, the audit's statements, the
+   rule set's filters and rules, and the config history drew this frame value for value (U08). The rows keep their own
+   grids; the list draws the frame and the line between rows. */
+.static-row-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+  overflow: hidden;
+  font-size: var(--static-tile-text-size);
+}
+
+.static-row-list > li + li {
+  border-top: 1px solid var(--static-tile-border);
+}
+
 /* Lifecycle spine, shared by LifecycleBoard (the run page), LifecycleOutline (the start page) and the lifecycle settings
    page: a hollow dot per stage, filled at the start (and at a complete end), joined by one rule line down the left.
    The three drew it value for value (U08). Each keeps its own row layout, and the settings page a wider gap. */

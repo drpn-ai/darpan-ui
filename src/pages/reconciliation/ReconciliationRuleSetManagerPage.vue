@@ -38,7 +38,7 @@
         </div>
       </template>
 
-      <ul class="ruleset-manager-rows" data-testid="ruleset-manager-filter-list">
+      <ul class="ruleset-manager-rows static-row-list" data-testid="ruleset-manager-filter-list">
         <li
           v-for="row in filterRows"
           :key="row.key"
@@ -68,7 +68,7 @@
         </div>
       </template>
       <InlineValidation v-if="readOptionError" tone="error" :message="readOptionError" data-testid="ruleset-manager-read-option-error" />
-      <ul class="ruleset-manager-rows" data-testid="ruleset-manager-read-option-list">
+      <ul class="ruleset-manager-rows static-row-list" data-testid="ruleset-manager-read-option-list">
         <li
           v-for="row in readOptionRows"
           :key="row.key"
@@ -114,7 +114,7 @@
             <span>{{ file2Title }}</span>
             <span>Pre-actions</span>
           </div>
-          <ol class="ruleset-manager-rows" data-testid="ruleset-manager-rule-list">
+          <ol class="ruleset-manager-rows static-row-list" data-testid="ruleset-manager-rule-list">
             <li
               v-for="rule in visibleRules"
               :key="rule.ruleId || `${rule.sequenceNum}-${rule.file1FieldPath}-${rule.file2FieldPath}`"
@@ -138,7 +138,7 @@
             </li>
           </ol>
         </div>
-        <ul v-else class="ruleset-manager-rows">
+        <ul v-else class="ruleset-manager-rows static-row-list">
           <li class="ruleset-manager-row ruleset-manager-row--note ruleset-manager-preview-line" data-testid="ruleset-manager-rule-none">
             {{ comparisonPreview }}
           </li>
@@ -1100,19 +1100,7 @@ onMounted(() => {
   justify-content: center;
 }
 
-/* DAR-UI-128. Filters and rules as one bordered list each, of equal read-only rows (the settings-page rows). */
-.ruleset-manager-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-  overflow: hidden;
-  font-size: var(--static-tile-text-size);
-}
-
+/* DAR-UI-128. Filters and rules as one bordered list each (.static-row-list), of equal read-only rows. */
 .ruleset-manager-row {
   display: grid;
   align-items: center;
@@ -1120,10 +1108,6 @@ onMounted(() => {
   min-width: 0;
   min-height: 3.4rem;
   padding: var(--space-1-5) var(--space-3);
-}
-
-.ruleset-manager-row + .ruleset-manager-row {
-  border-top: 1px solid var(--static-tile-border);
 }
 
 .ruleset-manager-row--filter {

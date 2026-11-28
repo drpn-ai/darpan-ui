@@ -13,7 +13,7 @@
       data-testid="run-conclusions-error"
     />
 
-    <ul v-if="loaded" class="run-conclusion-list" data-testid="run-conclusions-list">
+    <ul v-if="loaded" class="run-conclusion-list static-row-list" data-testid="run-conclusions-list">
       <li
         v-for="(node, index) in list"
         :key="node.uid"
@@ -76,22 +76,6 @@ const { loading, loaded, errors, list, unexplained, lineContext, conclusionLabel
   display: grid;
   gap: var(--space-2);
   min-width: 0;
-}
-
-.run-conclusion-list {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-  overflow: hidden;
-  font-size: var(--static-tile-text-size);
-}
-
-.run-conclusion + .run-conclusion {
-  border-top: 1px solid var(--static-tile-border);
 }
 
 /* Every row the same height: each column clamped, the numbers line up. */

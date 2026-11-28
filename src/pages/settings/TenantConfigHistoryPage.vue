@@ -15,7 +15,7 @@
     <StaticPageSection v-if="earlier.length" class="config-history-days">
       <template v-for="group in dayGroups" :key="group.key">
         <h2 class="micro-label config-history-day" data-testid="config-day">{{ group.label }}</h2>
-        <ul class="config-history-rows">
+        <ul class="config-history-rows static-row-list">
           <li v-for="version in group.versions" :key="version.id">
             <component
               :is="canRestore(version) ? 'button' : 'div'"
@@ -295,25 +295,9 @@ onMounted(loadVersions)
 }
 
 /* The Tenant Settings row pattern (DAR-UI-122): one bordered list, every row the same minimum height. */
-.config-history-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-  overflow: hidden;
-  font-size: var(--static-tile-text-size);
-}
-
 .config-history-day {
   margin: var(--space-2) 0 0;
   font-weight: 400;
-}
-
-.config-history-rows > li + li {
-  border-top: 1px solid var(--static-tile-border);
 }
 
 .config-history-row {
