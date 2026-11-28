@@ -152,7 +152,7 @@
               aria-label="Change password"
               title="Change password"
               data-testid="user-password-change"
-              @click="openPasswordWorkflow"
+              @click="passwordFlow.open"
             >
               <AppIcon name="edit" />
             </button>
@@ -227,7 +227,7 @@
               :aria-label="authStore.emailAddressMasked ? 'Change recovery email' : 'Add recovery email'"
               :title="authStore.emailAddressMasked ? 'Change recovery email' : 'Add recovery email'"
               data-testid="recovery-email-change"
-              @click="openRecoveryEmailWorkflow"
+              @click="recoveryFlow.open"
             >
               <AppIcon :name="authStore.emailAddressMasked ? 'edit' : 'plus'" />
             </button>
@@ -245,7 +245,7 @@
           </div>
         </article>
       </div>
-      <p v-if="passwordMessage" class="section-note">{{ passwordMessage }}</p>
+      <p v-if="passwordFlow.message" class="section-note">{{ passwordFlow.message }}</p>
       <p v-if="twoFactorLoadError" class="section-note" role="alert" data-testid="two-factor-load-error">{{ twoFactorLoadError }}</p>
       <p v-if="twoFactorStatus?.codesLocked" class="section-note" role="alert" data-testid="two-factor-locked">
         Codes are locked after too many wrong tries. A password reset unlocks them.
@@ -356,12 +356,12 @@
   </div>
 
   <div
-    v-if="isPasswordWorkflowOpen"
+    v-if="passwordFlow.isOpen"
     class="popup-workflow-overlay"
     role="dialog"
     aria-modal="true"
     aria-labelledby="password-workflow-title"
-    @click.self="closePasswordWorkflow"
+    @click.self="passwordFlow.close"
   >
     <section class="popup-workflow-modal workflow-panel">
       <header class="workflow-panel-header">
@@ -371,23 +371,23 @@
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
           class="workflow-form--popup-compact"
-          :question="passwordStep.question"
-          :primary-label="passwordPrimaryLabel"
-          :submit-disabled="isPasswordStepBlocked"
-          :show-back="passwordStepIndex > 0"
+          :question="passwordFlow.step.question"
+          :primary-label="passwordFlow.primaryLabel"
+          :submit-disabled="passwordFlow.isStepBlocked"
+          :show-back="passwordFlow.stepIndex > 0"
           :show-cancel-action="false"
           :show-enter-hint="true"
           primary-test-id="password-workflow-next"
-          @back="goBackPasswordStep"
-          @submit="submitPasswordStep"
+          @back="passwordFlow.back"
+          @submit="passwordFlow.submit"
         >
-          <label class="workflow-context-block" :aria-label="passwordStep.label">
+          <label class="workflow-context-block" :aria-label="passwordFlow.step.label">
             <input
-              v-model="passwordStepValue"
+              v-model="passwordFlow.stepValue"
               class="wizard-answer-control"
-              :name="passwordStep.name"
+              :name="passwordFlow.step.name"
               type="password"
-              :autocomplete="passwordStep.autocomplete"
+              :autocomplete="passwordFlow.step.autocomplete"
               required
             />
           </label>
@@ -409,12 +409,12 @@
   />
 
   <div
-    v-if="isRecoveryEmailWorkflowOpen"
+    v-if="recoveryFlow.isOpen"
     class="popup-workflow-overlay"
     role="dialog"
     aria-modal="true"
     aria-labelledby="recovery-email-workflow-title"
-    @click.self="closeRecoveryEmailWorkflow"
+    @click.self="recoveryFlow.close"
   >
     <section class="popup-workflow-modal workflow-panel" data-testid="recovery-email-workflow">
       <header class="workflow-panel-header">
@@ -424,23 +424,23 @@
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
           class="workflow-form--popup-compact"
-          :question="recoveryStep.question"
-          :primary-label="recoveryPrimaryLabel"
-          :submit-disabled="isRecoveryStepBlocked"
-          :show-back="recoveryStepIndex > 0"
+          :question="recoveryFlow.step.question"
+          :primary-label="recoveryFlow.primaryLabel"
+          :submit-disabled="recoveryFlow.isStepBlocked"
+          :show-back="recoveryFlow.stepIndex > 0"
           :show-cancel-action="false"
           :show-enter-hint="true"
           primary-test-id="recovery-email-next"
-          @back="recoveryStepIndex = 0"
-          @submit="submitRecoveryStep"
+          @back="recoveryFlow.back"
+          @submit="recoveryFlow.submit"
         >
-          <label class="workflow-context-block" :aria-label="recoveryStep.label">
+          <label class="workflow-context-block" :aria-label="recoveryFlow.step.label">
             <input
-              v-model="recoveryStepValue"
+              v-model="recoveryFlow.stepValue"
               class="wizard-answer-control"
-              :name="recoveryStep.name"
-              :type="recoveryStep.type"
-              :autocomplete="recoveryStep.autocomplete"
+              :name="recoveryFlow.step.name"
+              :type="recoveryFlow.step.type"
+              :autocomplete="recoveryFlow.step.autocomplete"
               required
             />
           </label>
@@ -532,8 +532,11 @@
 </template>
 
 <script setup lang="ts">
+// DAR-UI-121 and the items named on each section. DAR-OPS-029 U09: the password and recovery-email step popups
+// (useOwnPasswordFlows), two-factor and passkeys (useTwoFactorSettings) and the CLI section (useCliSessions) live in
+// their own composables; the page keeps the badge, the preferences and the popups' chrome.
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AppIcon from '../../components/ui/AppIcon.vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
@@ -541,48 +544,48 @@ import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
-import { ApiCallError } from '../../lib/api/client'
-import { authFacade, settingsFacade } from '../../lib/api/facade'
-import { cachedRead } from '../../lib/api/readCache'
-import type {
-  CliSession,
-  GetTwoFactorStatusResponse,
-  MyCliAccess,
-  TenantChatSpace,
-  TwoFactorPasskey,
-  UserNotificationDefault,
-} from '../../lib/api/types'
 import CliAccessRequestCard from '../../components/settings/CliAccessRequestCard.vue'
-import TwoFactorSettingsPopup, {
-  type TwoFactorSettingsAction,
-  type TwoFactorSettingsChange,
-} from '../../components/settings/TwoFactorSettingsPopup.vue'
-import { passkeysSupported } from '../../lib/passkeys'
+import TwoFactorSettingsPopup from '../../components/settings/TwoFactorSettingsPopup.vue'
+import { useCliSessions } from '../../composables/useCliSessions'
+import { usePasswordChange, useRecoveryEmail } from '../../composables/useOwnPasswordFlows'
+import { useTwoFactorSettings } from '../../composables/useTwoFactorSettings'
+import { ApiCallError } from '../../lib/api/client'
+import { settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
+import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import {
   COMMAND_PALETTE_OPEN_REQUEST_EVENT,
   WORKFLOW_CANCEL_REQUEST_EVENT,
-  WORKFLOW_HINT_REQUEST_EVENT,
   type CommandPaletteOpenRequestDetail,
 } from '../../lib/uiEvents'
 import { formatDateTime, formatShortDate } from '../../lib/utils/date'
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
+const pageAbortController = new AbortController()
+
+const passwordFlow = reactive(usePasswordChange())
+const recoveryFlow = reactive(useRecoveryEmail())
+const {
+  cliSessions, cliSessionsError, cliSessionsLoadFailed, revokingCliSessionId, myCliAccess,
+  loadCliSessions, loadMyCliAccess, revokeCliSession,
+} = useCliSessions(pageAbortController.signal)
+const {
+  twoFactorStatus, twoFactorLoadError, twoFactorAction, twoFactorMessage, removingPasskey, passkeyError,
+  passkeyNameRevision, isManagePasskeysOpen, twoFactorOn, appOn, passkeys, hasPasskeys, passkeysShown, canAddPasskey,
+  twoFactorSummary, recoveryCodesLeftLabel, loadTwoFactorStatus, openTwoFactor, openManagePasskeys,
+  closeManagePasskeys, removeFromManage, renamePasskey, handleTwoFactorChanged,
+} = useTwoFactorSettings({ signal: pageAbortController.signal, onSessionsEnded: () => { void loadCliSessions() } })
 
 const settingsMessage = ref<string | null>(null)
-const passwordMessage = ref<string | null>(null)
-const isPasswordWorkflowOpen = ref(false)
-const passwordStepIndex = ref(0)
 const isSavingDisplayName = ref(false)
 const displayNameMessage = ref<string | null>(null)
 // Bumped to redraw the name when a save is refused or left empty (the field shows what was typed until then).
 const displayNameRevision = ref(0)
 const displayNameTitle = ref<InstanceType<typeof StaticEditableTitle> | null>(null)
-const isVerifyingCurrentPassword = ref(false)
-const isChangingPassword = ref(false)
 const notificationDefault = ref<UserNotificationDefault | null>(null)
 const isNotificationDefaultWorkflowOpen = ref(false)
 const isSavingNotificationDefault = ref(false)
@@ -600,31 +603,6 @@ const timezoneForm = ref({ timeZone: '' })
 // Confirmed/displayed value, updated directly on a successful save rather than re-derived from sessionInfo: keeps the
 // summary in lockstep with what was persisted without depending on session refresh timing.
 const savedUserTimeZone = ref('')
-const passwordForm = ref({
-  currentPassword: '',
-  newPassword: '',
-  newPasswordVerify: '',
-})
-const passwordSteps = [
-  {
-    name: 'currentPassword',
-    label: 'Current Password',
-    question: 'Enter your current password.',
-    autocomplete: 'current-password',
-  },
-  {
-    name: 'newPassword',
-    label: 'New Password',
-    question: 'Enter your new password.',
-    autocomplete: 'new-password',
-  },
-  {
-    name: 'newPasswordVerify',
-    label: 'Verify Password',
-    question: 'Enter your new password again.',
-    autocomplete: 'new-password',
-  },
-] as const
 const sessionInfo = computed(() => authStore.sessionInfo)
 const userId = computed(() => sessionInfo.value?.userId ?? '')
 const username = computed(() => sessionInfo.value?.username ?? sessionInfo.value?.userId ?? '')
@@ -688,26 +666,6 @@ const chatSpaceChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
     shortcutKey: String.fromCharCode(65 + index),
   }))
 })
-const passwordStep = computed(() => passwordSteps[passwordStepIndex.value] ?? passwordSteps[0])
-const passwordPrimaryLabel = computed(() => {
-  if (passwordStep.value.name === 'currentPassword' && isVerifyingCurrentPassword.value) return 'Checking'
-  return passwordStepIndex.value === passwordSteps.length - 1 ? (isChangingPassword.value ? 'Changing' : 'Change') : 'OK'
-})
-const passwordStepValue = computed({
-  get() {
-    return passwordForm.value[passwordStep.value.name]
-  },
-  set(value: string) {
-    passwordForm.value = {
-      ...passwordForm.value,
-      [passwordStep.value.name]: value,
-    }
-  },
-})
-const isPasswordStepBlocked = computed(() => {
-  if (isChangingPassword.value || isVerifyingCurrentPassword.value) return true
-  return passwordStepValue.value.trim().length === 0
-})
 
 watch(
   userTimeZone,
@@ -750,191 +708,17 @@ function openSwitchTenant(): void {
   }))
 }
 
-function openPasswordWorkflow(): void {
-  isPasswordWorkflowOpen.value = true
-  passwordStepIndex.value = 0
-  passwordMessage.value = null
-}
-
-function closePasswordWorkflow(): void {
-  isPasswordWorkflowOpen.value = false
-  passwordStepIndex.value = 0
-  passwordMessage.value = null
-  passwordForm.value = {
-    currentPassword: '',
-    newPassword: '',
-    newPasswordVerify: '',
-  }
-}
-
+// Esc on the two step popups, which show no cancel of WorkflowStepForm's own; the others close through theirs.
 function handleCancelRequest(event: Event): void {
-  if (isRecoveryEmailWorkflowOpen.value) {
+  if (recoveryFlow.isOpen) {
     event.preventDefault()
-    closeRecoveryEmailWorkflow()
+    recoveryFlow.close()
     return
   }
-  if (!isPasswordWorkflowOpen.value) return
+  if (!passwordFlow.isOpen) return
 
   event.preventDefault()
-  closePasswordWorkflow()
-}
-
-// DAR-BE-028 recovery email: current password first (the backend re-checks it on save, so a session token
-// alone cannot redirect reset codes), then the address.
-const isRecoveryEmailWorkflowOpen = ref(false)
-const isSavingRecoveryEmail = ref(false)
-const recoveryStepIndex = ref(0)
-const recoveryForm = ref({ currentPassword: '', emailAddress: '' })
-const recoverySteps = [
-  {
-    name: 'currentPassword',
-    label: 'Current Password',
-    question: 'Enter your current password.',
-    type: 'password',
-    autocomplete: 'current-password',
-  },
-  {
-    name: 'emailAddress',
-    label: 'Recovery Email',
-    question: 'Where should password reset codes go?',
-    type: 'email',
-    autocomplete: 'email',
-  },
-] as const
-const recoveryStep = computed(() => recoverySteps[recoveryStepIndex.value] ?? recoverySteps[0])
-const recoveryStepValue = computed({
-  get(): string {
-    return recoveryForm.value[recoveryStep.value.name]
-  },
-  set(value: string): void {
-    recoveryForm.value = { ...recoveryForm.value, [recoveryStep.value.name]: value }
-  },
-})
-const recoveryPrimaryLabel = computed(() => {
-  if (recoveryStepIndex.value < recoverySteps.length - 1) return 'OK'
-  return isSavingRecoveryEmail.value ? 'Saving' : 'Save'
-})
-const isRecoveryStepBlocked = computed(() =>
-  isSavingRecoveryEmail.value || isVerifyingCurrentPassword.value || recoveryStepValue.value.trim().length === 0)
-
-function openRecoveryEmailWorkflow(): void {
-  recoveryForm.value = { currentPassword: '', emailAddress: '' }
-  recoveryStepIndex.value = 0
-  isRecoveryEmailWorkflowOpen.value = true
-}
-
-function closeRecoveryEmailWorkflow(): void {
-  isRecoveryEmailWorkflowOpen.value = false
-  recoveryStepIndex.value = 0
-  recoveryForm.value = { currentPassword: '', emailAddress: '' }
-}
-
-async function submitRecoveryStep(): Promise<void> {
-  if (recoveryStep.value.name === 'currentPassword') {
-    if (isVerifyingCurrentPassword.value) return
-    isVerifyingCurrentPassword.value = true
-    try {
-      if (!(await authStore.verifyOwnPassword(recoveryForm.value.currentPassword))) {
-        showPasswordWorkflowWarning(authStore.error || 'Password incorrect.')
-        return
-      }
-    } finally {
-      isVerifyingCurrentPassword.value = false
-    }
-    recoveryStepIndex.value = 1
-    return
-  }
-
-  if (isSavingRecoveryEmail.value) return
-  isSavingRecoveryEmail.value = true
-  try {
-    const saved = await authStore.saveRecoveryEmail(recoveryForm.value.emailAddress.trim(), recoveryForm.value.currentPassword)
-    if (!saved) {
-      showPasswordWorkflowWarning(authStore.error || 'Unable to save the recovery email.')
-      return
-    }
-    closeRecoveryEmailWorkflow()
-  } finally {
-    isSavingRecoveryEmail.value = false
-  }
-}
-
-function goBackPasswordStep(): void {
-  passwordStepIndex.value = Math.max(0, passwordStepIndex.value - 1)
-}
-
-async function submitPasswordStep(): Promise<void> {
-  if (passwordStep.value.name === 'currentPassword') {
-    const verified = await verifyCurrentPasswordStep()
-    if (!verified) return
-  }
-
-  if (passwordStepIndex.value < passwordSteps.length - 1) {
-    passwordStepIndex.value += 1
-    return
-  }
-
-  await submitPasswordChange()
-}
-
-async function verifyCurrentPasswordStep(): Promise<boolean> {
-  if (isVerifyingCurrentPassword.value) return false
-
-  isVerifyingCurrentPassword.value = true
-  try {
-    const verified = await authStore.verifyOwnPassword(passwordForm.value.currentPassword)
-    if (!verified) {
-      showPasswordWorkflowWarning(authStore.error || 'Password incorrect.')
-      return false
-    }
-
-    return true
-  } finally {
-    isVerifyingCurrentPassword.value = false
-  }
-}
-
-function showPasswordWorkflowWarning(message: string): void {
-  document.dispatchEvent(new CustomEvent(WORKFLOW_HINT_REQUEST_EVENT, {
-    detail: {
-      message,
-      tone: 'warning',
-      durationMs: 5000,
-    },
-  }))
-}
-
-async function submitPasswordChange(): Promise<void> {
-  if (isChangingPassword.value) return
-  // The popup stays open on a refusal, and a page-level note would sit behind its scrim: the hint says it on top.
-  if (passwordForm.value.newPassword !== passwordForm.value.newPasswordVerify) {
-    showPasswordWorkflowWarning('New passwords do not match.')
-    return
-  }
-
-  isChangingPassword.value = true
-  passwordMessage.value = null
-  try {
-    const changed = await authStore.changeOwnPassword({
-      currentPassword: passwordForm.value.currentPassword,
-      newPassword: passwordForm.value.newPassword,
-      newPasswordVerify: passwordForm.value.newPasswordVerify,
-    })
-    if (changed) {
-      passwordForm.value = {
-        currentPassword: '',
-        newPassword: '',
-        newPasswordVerify: '',
-      }
-      isPasswordWorkflowOpen.value = false
-      passwordStepIndex.value = 0
-      passwordMessage.value = 'Password changed.'
-    } else {
-      showPasswordWorkflowWarning(authStore.error || 'Unable to change password.')
-    }
-  } finally {
-    isChangingPassword.value = false
-  }
+  passwordFlow.close()
 }
 
 async function loadNotificationDefault(): Promise<void> {
@@ -1024,88 +808,6 @@ async function saveUserTimezone(): Promise<void> {
   }
 }
 
-const pageAbortController = new AbortController()
-
-const cliSessions = ref<CliSession[]>([])
-const cliSessionsError = ref<string | null>(null)
-const cliSessionsLoadFailed = ref(false)
-const revokingCliSessionId = ref<string | null>(null)
-const CLI_SESSIONS_LOAD_ERROR = 'Could not load CLI sessions.'
-// DAR-BE-209: the CLI state in the active tenant, with the request when it is not on. Not shown when it cannot be read.
-const myCliAccess = ref<MyCliAccess | null>(null)
-
-async function loadMyCliAccess() {
-  try {
-    const response = await authFacade.getMyCliAccess(pageAbortController.signal)
-    if (pageAbortController.signal.aborted) return
-    myCliAccess.value = response.access ?? null
-  } catch {
-    if (!pageAbortController.signal.aborted) myCliAccess.value = null
-  }
-}
-
-async function loadCliSessions() {
-  try {
-    const response = await authFacade.listCliSessions(pageAbortController.signal)
-    if (pageAbortController.signal.aborted) return
-    if (!response.ok) {
-      cliSessionsLoadFailed.value = true
-      cliSessionsError.value = response.errors?.[0] ?? CLI_SESSIONS_LOAD_ERROR
-      return
-    }
-    cliSessions.value = response.cliSessions ?? []
-  } catch {
-    if (pageAbortController.signal.aborted) return
-    cliSessionsLoadFailed.value = true
-    cliSessionsError.value = CLI_SESSIONS_LOAD_ERROR
-  }
-}
-
-async function revokeCliSession(cliSessionId: string) {
-  if (revokingCliSessionId.value) return
-  revokingCliSessionId.value = cliSessionId
-  cliSessionsError.value = null
-  try {
-    const response = await authFacade.revokeCliSession({ cliSessionId }, pageAbortController.signal)
-    if (pageAbortController.signal.aborted) return
-    if (!response.ok || (response.errors?.length ?? 0) > 0) {
-      cliSessionsError.value = response.errors?.[0] ?? 'Could not revoke that CLI session.'
-      return
-    }
-    cliSessions.value = cliSessions.value.filter((session) => session.cliSessionId !== cliSessionId)
-  } catch (error) {
-    if (pageAbortController.signal.aborted) return
-    cliSessionsError.value = error instanceof ApiCallError ? error.message : 'Could not revoke that CLI session.'
-  } finally {
-    revokingCliSessionId.value = null
-  }
-}
-
-// ─── Two-factor (DAR-BE-264) ───────────────────────────────────────────────────
-// The cards and their actions show only once the status is read: what to offer depends on it.
-const twoFactorStatus = ref<GetTwoFactorStatusResponse | null>(null)
-const twoFactorLoadError = ref<string | null>(null)
-const twoFactorAction = ref<TwoFactorSettingsAction | null>(null)
-const twoFactorMessage = ref<string | null>(null)
-
-const twoFactorOn = computed(() => twoFactorStatus.value?.enabled === true)
-const appOn = computed(() => twoFactorStatus.value?.appEnabled === true)
-const passkeys = computed<TwoFactorPasskey[]>(() => twoFactorStatus.value?.passkeys ?? [])
-const hasPasskeys = computed(() => passkeys.value.length > 0)
-const passkeysShown = computed(() => twoFactorStatus.value?.passkeysAvailable === true || hasPasskeys.value)
-// Ten is the backend's cap; this browser must be able to make one.
-const canAddPasskey = computed(() => twoFactorStatus.value?.passkeysAvailable === true && passkeysSupported() && passkeys.value.length < 10)
-const twoFactorSummary = computed(() => {
-  if (appOn.value) {
-    // confirmedDate is when two-factor first went on: the app's own date only while it is the only factor.
-    const since = hasPasskeys.value ? '' : formatShortDate(twoFactorStatus.value?.confirmedDate)
-    return since ? `On since ${since}` : 'On'
-  }
-  if (twoFactorOn.value) return 'Off'
-  const due = formatShortDate(twoFactorStatus.value?.requiredFromDate)
-  if (twoFactorStatus.value?.required) return 'Off. Required now'
-  return due ? `Off. Due ${due}` : 'Off'
-})
 // Even pairs (DAR-UI-121): cards sit two to a row at one height; an odd last card spans the row rather than
 // leaving a hole or taking a filler beside it.
 function isOddLast(index: number, count: number): boolean {
@@ -1131,103 +833,13 @@ const signInCards = computed<SignInCard[]>(() => {
   return cards.filter((card): card is SignInCard => card !== false)
 })
 const isPopupOpen = computed(() => (
-  isPasswordWorkflowOpen.value
+  passwordFlow.isOpen
   || isNotificationDefaultWorkflowOpen.value
   || isTimezoneWorkflowOpen.value
-  || isRecoveryEmailWorkflowOpen.value
+  || recoveryFlow.isOpen
   || isManagePasskeysOpen.value
   || twoFactorAction.value !== null
 ))
-const recoveryCodesLeftLabel = computed(() => `${twoFactorStatus.value?.recoveryCodesLeft ?? 0} left`)
-
-async function loadTwoFactorStatus(): Promise<void> {
-  try {
-    const response = await authFacade.getTwoFactorStatus(pageAbortController.signal)
-    if (pageAbortController.signal.aborted) return
-    twoFactorStatus.value = response
-    twoFactorLoadError.value = null
-  } catch {
-    if (pageAbortController.signal.aborted) return
-    twoFactorStatus.value = null
-    twoFactorLoadError.value = 'Could not load two-factor.'
-  }
-}
-
-function openTwoFactor(action: TwoFactorSettingsAction): void {
-  twoFactorMessage.value = null
-  passkeyError.value = null
-  removingPasskey.value = null
-  twoFactorAction.value = action
-}
-
-const removingPasskey = ref<TwoFactorPasskey | null>(null)
-const passkeyError = ref<string | null>(null)
-// Bumped to redraw the names when a rename is refused or left empty (the field shows what was typed until then).
-const passkeyNameRevision = ref(0)
-
-function openRemovePasskey(passkey: TwoFactorPasskey): void {
-  openTwoFactor('remove-passkey')
-  removingPasskey.value = passkey
-}
-
-const isManagePasskeysOpen = ref(false)
-
-function openManagePasskeys(): void {
-  passkeyError.value = null
-  twoFactorMessage.value = null
-  isManagePasskeysOpen.value = true
-}
-
-function closeManagePasskeys(): void {
-  isManagePasskeysOpen.value = false
-}
-
-// Remove keeps its own proof step: Manage closes and the remove popup takes over.
-function removeFromManage(passkey: TwoFactorPasskey): void {
-  closeManagePasskeys()
-  openRemovePasskey(passkey)
-}
-
-// rename#Passkey: no proof (a label weakens nothing). Enter or leaving the field saves.
-async function renamePasskey(passkey: TwoFactorPasskey, typed: string): Promise<void> {
-  const name = typed.trim()
-  if (name === (passkey.name ?? '')) return
-  if (!name) {
-    passkeyNameRevision.value += 1
-    return
-  }
-  passkeyError.value = null
-  twoFactorMessage.value = null
-  try {
-    await authFacade.renamePasskey({ passkeyId: passkey.passkeyId, name }, pageAbortController.signal)
-    passkey.name = name
-  } catch (err) {
-    if (pageAbortController.signal.aborted) return
-    passkeyError.value = err instanceof ApiCallError ? err.message : 'Not renamed.'
-    passkeyNameRevision.value += 1
-  }
-}
-
-const TWO_FACTOR_CHANGE_TEXT: Record<TwoFactorSettingsChange, string> = {
-  on: 'Two-factor on. Other sessions and CLI sign-ins ended.',
-  codes: 'New recovery codes made. The old ones stopped working.',
-  off: 'Two-factor off. Other sessions and CLI sign-ins ended.',
-  'app-on': 'Authenticator app on. Other sessions and CLI sign-ins ended.',
-  'app-off': 'Authenticator app removed.',
-  'passkey-added': 'Passkey added.',
-  'passkey-removed': 'Passkey removed.',
-}
-
-async function handleTwoFactorChanged(change: TwoFactorSettingsChange): Promise<void> {
-  twoFactorMessage.value = TWO_FACTOR_CHANGE_TEXT[change]
-  await loadTwoFactorStatus()
-  // Turning it on swapped this tab's key and session already (confirm#TwoFactorSetup). Turning it off reissues
-  // nothing, so the session's flag and due date are set from the fresh status.
-  if (change === 'off') {
-    authStore.applyTwoFactorState({ enabled: false, dueDate: twoFactorStatus.value?.requiredFromDate ?? null })
-  }
-  if (change === 'on' || change === 'app-on' || change === 'off') void loadCliSessions()
-}
 
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
