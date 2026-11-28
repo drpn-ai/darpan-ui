@@ -576,6 +576,8 @@ describe('LoginPage', () => {
     await completeResetStep(wrapper, 'pwr.user')
     await enterCode(wrapper, '123456')
     expect(wrapper.text()).toContain('Enter your new password.')
+    // The same live rules as the forced change.
+    expect(wrapper.get('[data-testid="password-rule-length"]').attributes('data-met')).toBe('false')
     await completeResetStep(wrapper, 'N3w-password!')
     expect(wrapper.text()).toContain('Enter it again.')
     await completeResetStep(wrapper, 'N3w-password!')

@@ -318,12 +318,7 @@
           >
             Send a new code
           </button>
-          <ul v-if="resetStep.name === 'newPassword'" class="password-rules" aria-label="Password requirements">
-            <li v-for="rule in resetPasswordRules" :key="rule.id" :data-met="String(rule.met)" :class="{ met: rule.met }">
-              <span aria-hidden="true" class="password-rule-mark">{{ rule.met ? '✓' : '·' }}</span>
-              <span>{{ rule.label }}</span>
-            </li>
-          </ul>
+          <PasswordRules v-if="resetStep.name === 'newPassword'" :rules="resetPasswordRules" />
         </WorkflowStepForm>
       </template>
 
@@ -349,21 +344,7 @@
               required
             />
           </label>
-
-          <!-- Stated up front and checked as the user types. Without this the only way to discover
-               the backend's policy was to be rejected by it after submitting. -->
-          <ul v-if="isChoosingNewPassword" class="password-rules" aria-label="Password requirements">
-            <li
-              v-for="rule in passwordRules"
-              :key="rule.id"
-              :data-testid="`password-rule-${rule.id}`"
-              :data-met="String(rule.met)"
-              :class="{ met: rule.met }"
-            >
-              <span aria-hidden="true" class="password-rule-mark">{{ rule.met ? '✓' : '·' }}</span>
-              <span>{{ rule.label }}</span>
-            </li>
-          </ul>
+          <PasswordRules v-if="isChoosingNewPassword" :rules="passwordRules" />
         </WorkflowStepForm>
       </template>
 
@@ -380,6 +361,7 @@ import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import TwoFactorCodeSteps from '../components/auth/TwoFactorCodeSteps.vue'
 import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
 import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
+import PasswordRules from '../components/auth/PasswordRules.vue'
 import { formatShortDate } from '../lib/utils/date'
 import { authFacade } from '../lib/api/facade'
 import { AUTH_REQUIRED_MESSAGE } from '../lib/api/client'
