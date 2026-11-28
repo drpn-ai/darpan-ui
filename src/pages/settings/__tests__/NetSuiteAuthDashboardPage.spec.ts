@@ -67,6 +67,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 import { ApiCallError } from '../../../lib/api/client'
 import { invalidateReadCache } from '../../../lib/api/readCache'
 import NetSuiteAuthDashboardPage from '../NetSuiteAuthDashboardPage.vue'
+import { resolveExplainTarget } from '../../../lib/mascotTargets'
 
 function authConfigsResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -153,6 +154,16 @@ describe('NetSuiteAuthDashboardPage', () => {
     expect(listNsAuthConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
     expect(listNsRestletConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
     expect(wrapper.get('h1').text()).toBe('Rails Prod')
+
+    // Every label on the rendered page has a mascot answer (the markup sweep in mascotTargets.page.spec cannot see
+    // labels the shared ConnectionDashboard draws from data). Active and Username carry their own v-explain.
+    const labels = wrapper.findAll('.static-page-summary-label, .static-page-section-heading')
+      .map((label) => [label.element, label.text().trim()] as const)
+    expect(labels.length).toBeGreaterThan(4)
+    const unanswered = labels
+      .filter(([element, text]) => !['Active', 'Username'].includes(text) && !resolveExplainTarget(element))
+      .map(([, text]) => text)
+    expect(unanswered).toEqual([])
 
     const cards = Object.fromEntries(wrapper.findAll('.static-page-summary-card').map((card) => [
       card.get('.static-page-summary-label').text(),

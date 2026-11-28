@@ -1,248 +1,55 @@
 <template>
-  <StaticPageFrame :class="{ 'static-page-frame--popup-open': diagnostics.open.value }">
-    <template #hero>
-      <h1>{{ heroTitle }}</h1>
-    </template>
-
-    <p v-if="loading" class="section-note">Loading Shopify config...</p>
-    <InlineValidation v-else-if="error" tone="error" :message="error" />
-
-    <template v-else-if="config">
-      <InlineValidation v-if="deleteError" tone="error" :message="deleteError" />
-
-      <StaticPageSection>
-        <template #header>
-          <div class="static-page-section-header-row">
-            <h2 class="static-page-section-heading">Auth</h2>
-            <RouterLink
-              v-if="canManageConnections"
-              :to="editRoute"
-              class="app-icon-action static-page-section-edit-action"
-              data-testid="shopify-auth-edit-action"
-              aria-label="Edit Shopify Config"
-              @click="draftStore.setWorkflowOrigin(heroTitle, route.fullPath || `/settings/shopify/auth/${configId}`)"
-            >
-              <AppIcon name="edit" />
-            </RouterLink>
-          </div>
-        </template>
-
-        <div class="static-page-summary-grid">
-          <article class="static-page-summary-card">
-            <span class="static-page-summary-label">Config ID</span>
-            <span>{{ config.shopifyAuthConfigId }}</span>
-          </article>
-          <article class="static-page-summary-card static-page-summary-card--wide">
-            <span class="static-page-summary-label">Shop/API URL</span>
-            <span>{{ config.shopApiUrl }}</span>
-          </article>
-          <article class="static-page-summary-card">
-            <span class="static-page-summary-label">API Version</span>
-            <span>{{ apiVersion }}</span>
-          </article>
-          <article class="static-page-summary-card">
-            <span class="static-page-summary-label">Timezone</span>
-            <span>{{ timeZone }}</span>
-          </article>
-          <article class="static-page-summary-card">
-            <span v-explain="'connectionActive'" class="static-page-summary-label">Active</span>
-            <span>{{ activeLabel }}</span>
-          </article>
-        </div>
-      </StaticPageSection>
-
-      <SourceConfigEndpointsSection
-        :load-state="endpointsLoadState"
-        :error="endpointsError"
-        :endpoints="availableEndpoints"
-        list-test-id="shopify-endpoint-configs"
-        tile-test-id="shopify-endpoint-tile"
-      />
-    </template>
-
-    <StaticPageSection v-else>
-      <EmptyState title="Shopify config unavailable" />
-    </StaticPageSection>
-
-    <template v-if="config" #actions>
-      <div class="action-row settings-dashboard-footer-row">
-        <RouterLink
-          to="/settings/shopify"
-          class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
-          data-testid="back-shopify-auth"
-          aria-label="Back to Shopify Settings"
-        >
-          <AppIcon name="back" />
-        </RouterLink>
-
-        <button
-          v-if="canManageConnections"
-          type="button"
-          class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
-          data-testid="diagnose-shopify-auth"
-          aria-label="Run connection diagnostics"
-          title="Run connection diagnostics"
-          :disabled="diagnostics.running.value"
-          @click="runDiagnostics"
-        >
-          <AppIcon name="diagnostics" />
-        </button>
-
-        <button
-          v-if="canManageConnections"
-          type="button"
-          class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
-          data-testid="delete-shopify-auth"
-          aria-label="Delete Shopify config"
-          :disabled="deletingConfig"
-          @click="deleteConfig"
-        >
-          <AppIcon name="trash" />
-        </button>
-      </div>
-    </template>
-  </StaticPageFrame>
-
-  <ConnectionDiagnosticsPopup
-    v-if="diagnostics.open.value"
-    :running="diagnostics.running.value"
-    :available="diagnostics.available.value"
-    :connection-ok="diagnostics.connectionOk.value"
-    :checks="diagnostics.checks.value"
-    :error="diagnostics.error.value"
-    @close="diagnostics.close"
+  <ConnectionDashboard
+    system="Shopify"
+    noun="Shopify config"
+    delete-noun="Shopify config"
+    list-path="/settings/shopify"
+    :config-id="configId"
+    :read="{
+      cacheKey: `shopifyAuthDashboard.config:${configId}`,
+      fetch: async (signal) => {
+        const response = await settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: configId }, signal)
+        return response.shopifyAuthConfig ? [response.shopifyAuthConfig] : []
+      },
+    }"
+    :id-of="(config) => config.shopifyAuthConfigId"
+    :missing-message="missingMessage"
+    load-failed-message="This Shopify config is still out shopping."
+    :facts="(config) => [
+      { key: 'id', label: 'Config ID', value: config.shopifyAuthConfigId },
+      { key: 'url', label: 'Shop/API URL', value: config.shopApiUrl, span: 'wide' },
+      { key: 'apiVersion', label: 'API Version', value: config.apiVersion?.trim() || '2026-01' },
+      { key: 'timeZone', label: 'Timezone', value: config.timeZone?.trim() || 'UTC' },
+      { key: 'active', label: 'Active', value: config.isActive === 'N' ? 'No' : 'Yes', explain: 'connectionActive' },
+    ]"
+    :edit-route="{ name: 'settings-shopify-edit', params: { shopifyAuthConfigId: configId } }"
+    edit-aria-label="Edit Shopify Config"
+    :remove="(shopifyAuthConfigId) => settingsFacade.deleteShopifyAuthConfig({ shopifyAuthConfigId })"
+    delete-failed-message="The Shopify config would not check out. Still here."
+    diagnostics-system-enum-id="SHOPIFY"
+    :endpoint-list="{
+      configType: SHARED_CONFIG_TYPES.shopifyAuth,
+      cacheKeyPrefix: 'shopifyAuthDashboard.endpoints',
+      listTestId: 'shopify-endpoint-configs',
+      tileTestId: 'shopify-endpoint-tile',
+    }"
+    :test-ids="{
+      edit: 'shopify-auth-edit-action',
+      back: 'back-shopify-auth',
+      diagnose: 'diagnose-shopify-auth',
+      delete: 'delete-shopify-auth',
+    }"
   />
 </template>
 
 <script setup lang="ts">
-import AppIcon from '../../components/ui/AppIcon.vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
-import EmptyState from '../../components/ui/EmptyState.vue'
-import InlineValidation from '../../components/ui/InlineValidation.vue'
-import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import StaticPageSection from '../../components/ui/StaticPageSection.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { settingsFacade } from '../../lib/api/facade'
-import { cachedRead } from '../../lib/api/readCache'
-import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
-import { useAuthStore } from '../../stores/auth'
-import { usePermissionsStore } from '../../stores/permissions'
-import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { resolveRecordLabel } from '../../lib/utils/recordLabel'
-import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
-import SourceConfigEndpointsSection from './SourceConfigEndpointsSection.vue'
-import { useConnectionDiagnostics } from './useConnectionDiagnostics'
-import { useSourceConfigEndpoints } from './useSourceConfigEndpoints'
+import ConnectionDashboard from './ConnectionDashboard.vue'
 
 const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const permissionsStore = usePermissionsStore()
-const draftStore = useReconciliationDraftStore()
-
-const config = ref<ShopifyAuthConfigRecord | null>(null)
-const loading = ref(false)
-const deletingConfig = ref(false)
-const error = ref<string | null>(null)
-const deleteError = ref<string | null>(null)
-
 const configId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
-const canManageConnections = computed(() => permissionsStore.canManageConnections)
-const heroTitle = computed(() => (
-  config.value
-    ? resolveRecordLabel({ description: config.value.description, fallbackId: config.value.shopifyAuthConfigId })
-    : 'Shopify'
-))
-const apiVersion = computed(() => config.value?.apiVersion?.trim() || '2026-01')
-const timeZone = computed(() => config.value?.timeZone?.trim() || 'UTC')
-const activeLabel = computed(() => (config.value?.isActive === 'N' ? 'No' : 'Yes'))
-const editRoute = computed(() => ({
-  name: 'settings-shopify-edit',
-  params: { shopifyAuthConfigId: configId.value },
-}))
-
-const pageAbortController = new AbortController()
-const {
-  availableEndpoints,
-  loadState: endpointsLoadState,
-  error: endpointsError,
-  load: loadEndpoints,
-} = useSourceConfigEndpoints({
-  configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth,
-  configId: () => configId.value,
-  cacheKeyPrefix: 'shopifyAuthDashboard.endpoints',
-  signal: pageAbortController.signal,
-})
-const diagnostics = useConnectionDiagnostics('SHOPIFY')
-
-function runDiagnostics(): void {
-  if (!config.value) return
-  void diagnostics.run(config.value.shopifyAuthConfigId)
-}
-
-onBeforeUnmount(() => {
-  pageAbortController.abort()
-  diagnostics.dispose()
-})
-
-async function load(): Promise<void> {
-  if (!configId.value) {
-    error.value = 'Shopify Config ID is missing.'
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  config.value = null
-  try {
-    await cachedRead(
-      `shopifyAuthDashboard.config:${configId.value}`,
-      () => settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: configId.value }, pageAbortController.signal),
-      (response) => {
-        const record = response.shopifyAuthConfig ?? null
-        const [tenantRecord] = record
-          ? filterRecordsForActiveTenant([record], authStore.sessionInfo?.activeTenantUserGroupId ?? null)
-          : []
-        // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
-        loading.value = false
-        config.value = tenantRecord ?? null
-        error.value = tenantRecord ? null : `Shopify config "${configId.value}" checked out without us.`
-      },
-    )
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'This Shopify config is still out shopping.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function deleteConfig(): Promise<void> {
-  if (!config.value || !canManageConnections.value || deletingConfig.value) return
-
-  const deleteLabel = resolveRecordLabel({
-    description: config.value.description,
-    fallbackId: config.value.shopifyAuthConfigId,
-  })
-  if (!window.confirm(`Delete Shopify config "${deleteLabel}"?`)) return
-
-  deletingConfig.value = true
-  deleteError.value = null
-  try {
-    await settingsFacade.deleteShopifyAuthConfig({ shopifyAuthConfigId: config.value.shopifyAuthConfigId })
-    await router.push('/settings/shopify')
-  } catch (deleteFailure) {
-    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'The Shopify config would not check out. Still here.'
-  } finally {
-    deletingConfig.value = false
-  }
-}
-
-onMounted(() => {
-  void load()
-  void loadEndpoints()
-})
+const missingMessage = computed(() => `Shopify config "${configId.value}" checked out without us.`)
 </script>

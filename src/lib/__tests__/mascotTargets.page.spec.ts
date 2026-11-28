@@ -335,10 +335,30 @@ describe('every label in the app has an answer', () => {
       })
       asCount.remove()
       asName.remove()
+      // A fact drawn from data names its label in script ({ key: 'url', label: 'Base URL', … }: StaticFactStrip,
+      // the connection pages' ConnectionDashboard). One that carries explain: '…' answers for itself.
+      for (const [fact, text = ''] of readFileSync(file, 'utf-8').matchAll(/\{\s*key: '[^']*', label: '([^']+)'[^{}]*\}/g)) {
+        if (fact.includes("explain: '")) continue
+        const el = document.createElement('span')
+        el.className = 'static-page-summary-label'
+        el.textContent = text
+        swept += 1
+        if (!resolveExplainTarget(el) && !SILENT[text.toLowerCase()]) unanswered.push(`${relative}: "${text}"`)
+      }
     }
+    // DAR-OPS-029: real gaps found by the label-literal sweep; U14 answers them (glossary or SILENT reason) and removes each line.
+    const KNOWN_GAPS = [
+      'pages/jsonschema/JsonSchemaEditorPage.vue: "Field Path"',
+      'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Values"',
+      'pages/reconciliation/NetSuiteQueryWorkflowPage.vue: "Column"',
+      'pages/reconciliation/ReconciliationRunResultPage.vue: "Conclusion"',
+      'pages/settings/TenantScriptPage.vue: "Sends as"',
+    ]
     expect(FILES.length, 'no components were swept — the glob is wrong').toBeGreaterThan(80)
     expect(swept, 'no labels were swept — the markup rewrite is wrong').toBeGreaterThan(150)
-    expect(unanswered, `labels with no answer:\n${unanswered.join('\n')}`).toEqual([])
+    expect(KNOWN_GAPS.filter((gap) => !unanswered.includes(gap)), 'answered now: remove it from KNOWN_GAPS').toEqual([])
+    const fresh = unanswered.filter((gap) => !KNOWN_GAPS.includes(gap))
+    expect(fresh, `labels with no answer:\n${fresh.join('\n')}`).toEqual([])
   })
 
   /**

@@ -90,6 +90,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import { ApiCallError } from '../../../lib/api/client'
 import ShopifyAuthDashboardPage from '../ShopifyAuthDashboardPage.vue'
+import { resolveExplainTarget } from '../../../lib/mascotTargets'
 
 function dashboardConfigResponse() {
   return {
@@ -171,6 +172,16 @@ describe('ShopifyAuthDashboardPage', () => {
     expect(wrapper.text()).toContain('Endpoints')
     expect(wrapper.text()).toContain('https://hotwax-sandbox.myshopify.com')
     expect(wrapper.text()).toContain('America/Chicago')
+
+    // Every label on the rendered page has a mascot answer (the markup sweep in mascotTargets.page.spec cannot see
+    // labels the shared ConnectionDashboard draws from data). Active and Username carry their own v-explain.
+    const labels = wrapper.findAll('.static-page-summary-label, .static-page-section-heading')
+      .map((label) => [label.element, label.text().trim()] as const)
+    expect(labels.length).toBeGreaterThan(4)
+    const unanswered = labels
+      .filter(([element, text]) => !['Active', 'Username'].includes(text) && !resolveExplainTarget(element))
+      .map(([, text]) => text)
+    expect(unanswered).toEqual([])
     const authSummaryCards = wrapper.findAll('.static-page-summary-card').map((card) => card.text())
     expect(authSummaryCards.some((cardText) => cardText.includes('Orders'))).toBe(false)
     expect(authSummaryCards.some((cardText) => cardText.includes('Read Orders'))).toBe(false)

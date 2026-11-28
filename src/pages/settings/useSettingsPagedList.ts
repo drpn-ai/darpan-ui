@@ -3,6 +3,7 @@ import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { cachedRead } from '../../lib/api/readCache'
 import type { PaginationMeta } from '../../lib/api/types'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useAuthStore } from '../../stores/auth'
 
 interface TenantOwnedRecord {
   companyUserGroupId?: string | null
@@ -35,6 +36,15 @@ function normalizePageCount(pageCount: number | undefined): number {
 
 function normalizeError(error: unknown, fallbackMessage: string): string {
   return error instanceof ApiCallError ? error.message : fallbackMessage
+}
+
+/** The active tenant's record that matches, or null: how every connection page finds the one record it shows. */
+export function findTenantRecord<T extends TenantOwnedRecord>(
+  records: readonly T[] | undefined,
+  matches: (record: T) => boolean,
+): T | null {
+  return filterRecordsForActiveTenant([...(records ?? [])], useAuthStore().sessionInfo?.activeTenantUserGroupId ?? null)
+    .find(matches) ?? null
 }
 
 export function useSettingsPagedList<T extends object, R extends PaginatedSettingsResponse>({
