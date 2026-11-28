@@ -102,7 +102,7 @@ export function countFor(counts: AuditFindingCounts | null | undefined, filter: 
 }
 
 /** DAR-UI-085. True while any check of the audit is running or queued. */
-export function isPlaying(progress: AuditProgress | null | undefined): progress is AuditProgress {
+function isPlaying(progress: AuditProgress | null | undefined): progress is AuditProgress {
   return Boolean(progress && progress.activeChecks > 0)
 }
 
@@ -536,17 +536,6 @@ export function causeHeading(item: AuditFindingSummary): string {
   return item.cause || splitHeadline(item.headline).rest
 }
 
-// DAR-BE-125. Findings with the same cause together, so its heading is said once: causes in the order their first finding
-// came, findings in their own order within a cause. An order unit says what holds it on its own row, so it stays alone.
-export function causeGroups<T extends AuditFindingSummary>(items: T[]): T[] {
-  const groups = new Map<string, T[]>()
-  items.forEach((item) => {
-    const key = item.kind === 'order' ? `order|${item.id}` : `cause|${causeHeading(item)}`
-    groups.set(key, [...(groups.get(key) ?? []), item])
-  })
-  return [...groups.values()].flat()
-}
-
 /** DAR-UI-098. One row of the findings column: a finding under its one cause heading. */
 export interface FindingRow<T extends AuditFindingSummary = AuditFindingSummary> {
   item: T
@@ -768,7 +757,8 @@ export interface AckPatch {
 }
 export type AckPatches = ReadonlyMap<string, AckPatch>
 
-function holdsFinding(item: AuditFindingSummary, id: string): boolean {
+/** The row that lists a finding: the finding's own, or the order whose line it is. */
+export function holdsFinding(item: AuditFindingSummary, id: string): boolean {
   return item.id === id || Boolean(item.lines?.some((line) => line.id === id))
 }
 

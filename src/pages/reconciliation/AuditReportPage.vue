@@ -216,11 +216,13 @@ import {
   findStatement,
   findingsLeft,
   hasFindingFilters,
+  holdsFinding,
   matchesFindingFilters,
   orderKey,
   isAuditFilter,
   sourceItems,
   statementItemsByPriority,
+  tenantToday,
   topLevel,
   type AuditFilter,
   type FindingFilters,
@@ -325,7 +327,7 @@ const linkedLevel = computed<AuditLevel | null>(() => {
   const id = findingId.value
   if (id) {
     const unit = [...(found?.findings ?? []), ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
-      .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))
+      .find((item) => holdsFinding(item, id))
     if (unit?.priority) return unit.priority
   }
   return findingHome.value?.priority?.level ?? topLevel(found?.counts)?.level ?? null
@@ -406,6 +408,7 @@ const todayLine = computed(() => {
 function errorOf(response: { errors?: string[] }, fallback: string): string {
   return response.errors?.[0] || fallback
 }
+const FINDINGS_LOST = 'The findings could not be found. Yes, really.'
 
 // quiet (DAR-UI-085): a refresh while a play runs keeps the page on screen and keeps the last report if it fails.
 /** True when the report was read (DAR-UI-155: a pending acknowledgement waits for one). */
@@ -475,12 +478,7 @@ const canRun = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const retryingChecks = ref<string[]>([])
 const isTodaysMorning = computed(() => {
   const doc = report.value?.report
-  if (!doc?.running) return false
-  try {
-    return doc.date === new Intl.DateTimeFormat('en-CA', { timeZone: doc.tenant.timeZone || 'UTC' }).format(new Date())
-  } catch {
-    return false
-  }
+  return Boolean(doc?.running) && doc!.date === tenantToday(doc!.tenant.timeZone || 'UTC')
 })
 
 // DAR-UI-087. A family row on Run health retries each of its stores that did not run, one after another.
@@ -535,13 +533,13 @@ const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
   return listedRows.value
-    .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
+    .find((item) => item.kind === 'order' && holdsFinding(item, id)) ?? null
 })
 // DAR-BE-250. The open finding's row (an order or a lone finding): what later steps report on the same order.
 const waiting = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return []
-  return listedRows.value.find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
+  return listedRows.value.find((item) => holdsFinding(item, id))?.waiting ?? []
 })
 // DAR-UI-143. A finding's state as the list says it: its line's on an order row, else its own row's.
 function listedState(id: string): string | undefined {
@@ -657,9 +655,9 @@ async function recheckAll(statement?: string): Promise<void> {
     for (let tries = 0; tries < RECHECK_POLL_TRIES && watching(); tries++) {
       await new Promise((resolve) => setTimeout(resolve, RECHECK_POLL_MS))
       if (!watching()) return
-      const progress = await auditFacade.getAuditRecheckProgress({ audit, period, ...scope, since: started.checkedSince })
-      closed = progress.closed ?? 0
-      if ((progress.checked ?? 0) >= total) {
+      const tally = await auditFacade.getAuditRecheckProgress({ audit, period, ...scope, since: started.checkedSince })
+      closed = tally.closed ?? 0
+      if ((tally.checked ?? 0) >= total) {
         say(closed >= total ? `Re-checked ${total}. All ${total} closed.` : `Re-checked ${total}. ${closed} closed, ${total - closed} still open.`)
         void loadReport({ quiet: true })
         return
@@ -704,16 +702,13 @@ async function readMore(): Promise<void> {
   more.value = { ...more.value, loading: true, error: '' }
   try {
     // DAR-UI-075. The rest as the report lists them, one per order, in one read. DAR-UI-140: at the level on show.
-    const response = await auditFacade.getAuditFindingsByOrder(
-      { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value, ...(level ? { priority: level } : {}) },
-      abort.signal,
-    )
+    const response = await readOrders(report.value.report.period, statement, level)
     if (stale()) return
     more.value = response.ok === false
-      ? { ...more.value, error: errorOf(response, 'The findings could not be found. Yes, really.') }
+      ? { ...more.value, error: errorOf(response, FINDINGS_LOST) }
       : { ...more.value, findings: response.findings ?? [], hasNextPage: false }
   } catch {
-    if (!abort.signal.aborted && !stale()) more.value = { ...more.value, error: 'The findings could not be found. Yes, really.' }
+    if (!abort.signal.aborted && !stale()) more.value = { ...more.value, error: FINDINGS_LOST }
   } finally {
     if (!stale()) more.value = { ...more.value, loading: false }
   }
@@ -723,6 +718,12 @@ async function readMore(): Promise<void> {
 // DAR-UI-144. Open excludes acknowledged rows; the acknowledged pill lists only those; all lists both.
 const pillState = computed<{ state?: 'open' | 'acknowledged' }>(() =>
   filter.value === 'open' || filter.value === 'acknowledged' ? { state: filter.value } : {})
+/** Every finding of the period under the pill, one per order: a statement's when named, at a level when named. */
+function readOrders(period: string, statement?: string, level?: AuditLevel | null) {
+  return auditFacade.getAuditFindingsByOrder({
+    audit: auditCode.value, period, ...(statement ? { statement } : {}), ...pillState.value, ...(level ? { priority: level } : {}),
+  }, abort.signal)
+}
 
 // DAR-UI-073. The toolbar's filters: ?q (an order or record id), ?cause, ?age (at least N days). The report lists 50
 // findings a statement and no cause, so a filter reads every open finding of the period, once per morning,
@@ -766,12 +767,12 @@ async function loadPeriodFindings(options: { force?: boolean } = {}): Promise<vo
   periodLoading = key
   periodError.value = ''
   try {
-    const response = await auditFacade.getAuditFindingsByOrder({ audit: auditCode.value, period, ...pillState.value }, abort.signal)
-    if (response.ok === false) throw new Error(errorOf(response, 'The findings could not be found. Yes, really.'))
+    const response = await readOrders(period)
+    if (response.ok === false) throw new Error(errorOf(response, FINDINGS_LOST))
     const items: AuditFindingListItem[] = response.findings ?? []
     if (key === periodKey.value) periodFindings.value = { key, items }
   } catch (error) {
-    if (!abort.signal.aborted) periodError.value = error instanceof Error ? error.message : 'The findings could not be found. Yes, really.'
+    if (!abort.signal.aborted) periodError.value = error instanceof Error ? error.message : FINDINGS_LOST
   } finally {
     if (periodLoading === key) periodLoading = ''
   }
@@ -795,7 +796,7 @@ function onAcknowledging(id: string, acknowledgement: AuditAcknowledgement | nul
   if (!report.value) return
   // A second change before the first is saved keeps the first's starting point.
   const held = ackPatches.value.get(id)
-  const unit = listedRows.value.find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))
+  const unit = listedRows.value.find((item) => holdsFinding(item, id))
   const next = new Map(ackPatches.value)
   next.set(id, {
     statement: selectedStatement.value, acknowledgement, was: held ? held.was : was, base: held ? held.base : report.value,
@@ -872,8 +873,7 @@ async function exportFindings(): Promise<void> {
   exportError.value = ''
   try {
     const level = pickedLevel.value
-    const response = await auditFacade.getAuditFindingsByOrder(
-      { audit: auditCode.value, statement, period, ...pillState.value, ...(level ? { priority: level } : {}) }, abort.signal)
+    const response = await readOrders(period, statement, level)
     if (response.ok === false) throw new Error(errorOf(response, 'The findings refused to leave the building. Nothing exported.'))
     const findings = response.findings ?? []
     saveJson(`${auditCode.value}-${period}-${statement}${level ? `-${level}` : ''}-findings.json`, {
@@ -1011,14 +1011,13 @@ async function lookUpOrders(options: { force?: boolean } = {}): Promise<void> {
   const key = `${periodKey.value}|${statement}`
   if (!report.value || !statement || (!options.force && orderLookup.value?.key === key)) return
   try {
-    const response = await auditFacade.getAuditFindingsByOrder(
-      { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value }, abort.signal)
+    const response = await readOrders(report.value.report.period, statement)
     if (key !== `${periodKey.value}|${selectedStatement.value}`) return
     orderLookup.value = response.ok === false
-      ? { key, items: [], error: errorOf(response, 'The findings could not be found. Yes, really.') }
+      ? { key, items: [], error: errorOf(response, FINDINGS_LOST) }
       : { key, items: response.findings ?? [], error: '' }
   } catch {
-    if (!abort.signal.aborted) orderLookup.value = { key, items: [], error: 'The findings could not be found. Yes, really.' }
+    if (!abort.signal.aborted) orderLookup.value = { key, items: [], error: FINDINGS_LOST }
   }
 }
 </script>

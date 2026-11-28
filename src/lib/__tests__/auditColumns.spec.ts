@@ -7,7 +7,6 @@ import {
   HEALTH,
   categoryItems,
   causeOptions,
-  causeGroups,
   findingRows,
   orderCauses,
   rowAlsoLabel,
@@ -425,12 +424,12 @@ describe('auditColumns', () => {
     expect(isAuditFilter('everything')).toBe(false)
   })
 
-  // DAR-BE-125 (Aditi: "the findings subheadings are not organized properly"). A cause is said once: its findings sit
-  // together under it, causes in the order their first finding came, findings in their own order within a cause.
+  // DAR-BE-125 (Aditi: "the findings subheadings are not organized properly"). A cause is said once (findingRows): its findings
+  // sit together under it, causes in the order their first finding came, findings in their own order within a cause.
   it('keeps each cause\'s findings together under one heading', () => {
     const f = (id: string, rest: string, kind?: 'order') => ({ id, headline: `Return ${id}: ${rest}`, kind }) as AuditFindingListItem
     const items = [f('a', 'Waits'), f('b', 'No order'), f('c', 'Backordered'), f('d', 'No order'), f('e', 'Backordered'), f('o', 'Held', 'order')]
-    expect(causeGroups(items).map((item) => item.id)).toEqual(['a', 'b', 'd', 'c', 'e', 'o'])
+    expect(findingRows(items).map((row) => row.item.id)).toEqual(['a', 'b', 'd', 'c', 'e', 'o'])
   })
 
   // DAR-UI-098 (Aditi: "order findings in a few named categories"). gorjana R1 2026-11-01: 14 orders read only "Order M…: N
@@ -502,7 +501,7 @@ describe('auditColumns', () => {
     const fresh = { id: 'b', headline: 'Return b: Order backordered', cause: 'Order backordered' } as AuditFindingListItem
     const bare = { id: 'c', headline: 'Return c: No RMA', cause: null } as AuditFindingListItem
     expect([old, fresh, bare].map(causeHeading)).toEqual(['Order backordered', 'Order backordered', 'No RMA'])
-    expect(causeGroups([old, bare, fresh]).map((item) => item.id)).toEqual(['a', 'b', 'c'])
+    expect(findingRows([old, bare, fresh]).map((row) => row.item.id)).toEqual(['a', 'b', 'c'])
   })
 
   // DAR-UI-087 (Aditi: "i dont like how this looks"): Run health › Checks lists every check under its category, a
