@@ -487,7 +487,7 @@
           title="Back to the run"
           :disabled="saving"
           data-testid="conclusions-editor-back"
-          @click="void back()"
+          @click="void returnToRun()"
         >
           <AppIcon name="back" />
         </button>
@@ -517,7 +517,7 @@ import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.v
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import AppCancelAction from '../../components/ui/AppCancelAction.vue'
 import ConclusionLine from '../../components/reconciliation/ConclusionLine.vue'
-import { outcomeLabel, useRunConclusions, type ConclusionDraft } from '../../composables/useRunConclusions'
+import { outcomeLabel, toOutcome, useRunConclusions, type ConclusionDraft } from '../../composables/useRunConclusions'
 import { loadConclusionFields, lookupFields, type CatalogResult } from '../../lib/conclusionFieldCatalog'
 import { OUTCOME_GLOSS, explainsLabel } from '../../lib/conclusionLines'
 import {
@@ -606,10 +606,6 @@ const saveDisabled = computed(() => saving.value || !loaded.value
 
 function rowName(node: ConclusionDraft): string {
   return conclusionLabel(node) || 'new'
-}
-
-function toOutcome(value: string): ConclusionDraft['outcome'] {
-  return value === 'HIDE' || value === 'EXPECTED' ? value : ''
 }
 
 function inputValue(event: Event): string {
@@ -721,6 +717,7 @@ function cancelChanges(): void {
   closeNewCode()
 }
 
+/** Back to the run; any way out runs the leave guard, which asks while changes wait. */
 async function returnToRun(): Promise<void> {
   await router.push({ path: draftStore.workflowOrigin?.path ?? '/reconciliation/ruleset-manager' })
 }
@@ -743,11 +740,6 @@ async function saveAndReturn(): Promise<void> {
     return
   }
   if (await conclusions.save()) await returnToRun()
-}
-
-/** The leave guard asks while changes wait. */
-async function back(): Promise<void> {
-  await returnToRun()
 }
 
 // Any way out (back, the sidebar, the browser) asks before unsaved changes are dropped; a save leaves nothing to ask about.

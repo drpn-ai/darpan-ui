@@ -96,7 +96,8 @@ function cloneList(list: ConclusionDraft[]): ConclusionDraft[] {
   }))
 }
 
-function toOutcome(value: string | null | undefined): ConclusionDraft['outcome'] {
+/** A stored or picked outcome as the draft holds it; anything else shows the row. */
+export function toOutcome(value: string | null | undefined): ConclusionDraft['outcome'] {
   return value === 'HIDE' || value === 'EXPECTED' ? value : ''
 }
 
