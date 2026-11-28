@@ -534,6 +534,8 @@ export interface OmsRestSourceConfigRecord {
 
 export interface SaveOmsRestSourceConfigResponse extends ApiEnvelope {
   savedOmsRestSourceConfig?: OmsRestSourceConfigRecord
+  /** 'HEADERS_NOT_CARRIED' when an edit moved the base URL or auth type and stored custom headers would not follow. */
+  reason?: string
 }
 
 export type DeleteOmsRestSourceConfigResponse = Schemas['DeleteHotWaxOmsRestSourceConfigResult']

@@ -2,6 +2,11 @@
   <WorkflowPage v-bind="pageBindings" aria-label="HotWax source setup progress">
     <InlineValidation v-if="error" tone="error" :message="error" />
     <p v-if="success" class="success-copy">{{ success }}</p>
+    <div v-if="confirmingHeaderRemoval" class="action-row" data-testid="oms-headers-confirm">
+      <span class="section-note">This connection has stored headers for its old address. Remove them and save?</span>
+      <AppSaveAction label="Remove and save" test-id="oms-headers-confirm-yes" :disabled="loading" @click="void removeHeadersAndSave()" />
+      <AppCancelAction label="Keep them" test-id="oms-headers-confirm-no" :disabled="loading" @click="confirmingHeaderRemoval = false" />
+    </div>
 
     <WorkflowStepForm
       v-bind="formBindings"
@@ -206,6 +211,8 @@ import WorkflowShortcutChoiceCards, {
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import AppSaveAction from '../../components/ui/AppSaveAction.vue'
+import AppCancelAction from '../../components/ui/AppCancelAction.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
 import EndpointAccessPanel, { type EndpointAccessLoadState } from '../../components/settings/EndpointAccessPanel.vue'
 import { settingsFacade } from '../../lib/api/facade'
@@ -302,6 +309,8 @@ const createSteps = computed<OmsCreateStep[]>(() => [
   { id: 'description', title: 'What label should Darpan show for this HotWax source?' },
 ])
 
+const SAVE_FAILED_MESSAGE = 'The HotWax source config slipped off the shelf. Not saved.'
+
 function dashboardRoute(omsRestSourceConfigId: string) {
   return { name: 'settings-oms-auth', params: { omsRestSourceConfigId } }
 }
@@ -337,7 +346,7 @@ const {
   loadFailedMessage: 'The HotWax source config is stuck in the warehouse.',
   permissionMessage: 'You do not have permission to save HotWax settings for the active tenant.',
   save,
-  saveFailedMessage: 'The HotWax source config slipped off the shelf. Not saved.',
+  saveFailedMessage: SAVE_FAILED_MESSAGE,
   cancelRoute: () => dashboardRoute(activeOmsConfigId.value),
 })
 const isCreateChoiceStep = computed(() => !isEditing.value && currentCreateStep.value.id === 'authType')
@@ -365,8 +374,23 @@ function applyRecord(record: OmsRestSourceConfigRecord): void {
   // unticked (verified live; see ShopifyAuthWorkflowPage.applyRecord).
 }
 
+// C4 (darpan-hotwax 216da11): stored custom headers never follow a moved base URL or auth type on their own. The save
+// refuses with HEADERS_NOT_CARRIED; the user's yes resends it once with headersJson {} (remove them).
+const confirmingHeaderRemoval = ref(false)
+let removeStoredHeaders = false
+
+async function removeHeadersAndSave(): Promise<void> {
+  removeStoredHeaders = true
+  try {
+    await handlePrimarySubmit()
+  } finally {
+    removeStoredHeaders = false
+  }
+}
+
 async function save(): Promise<ConnectionSaveOutcome> {
   const editing = isEditing.value
+  confirmingHeaderRemoval.value = false
   // A Save clicked while the panel's read is still in flight, or after it failed, means
   // enabledEndpoints does not reflect confirmed server truth -- see the guard below.
   const endpointsReady = endpointsLoadState.value === 'ready'
@@ -380,7 +404,9 @@ async function save(): Promise<ConnectionSaveOutcome> {
     username: isBasicAuth.value ? form.username.trim() : '',
     password: isBasicAuth.value ? form.password.trim() : '',
     apiToken: isApiTokenAuth.value ? form.apiToken.trim() : '',
-    // No headersJson: this form has no headers field, and an edit without it keeps the stored ones (OC172).
+    // No headersJson unless the user agreed to remove them: this form has no headers field, and an edit without it
+    // keeps the stored ones (OC172).
+    ...(removeStoredHeaders ? { headersJson: '{}' as const } : {}),
     connectTimeoutSeconds: form.connectTimeoutSeconds,
     readTimeoutSeconds: form.readTimeoutSeconds,
     isActive: form.isActive === 'Y',
@@ -388,6 +414,11 @@ async function save(): Promise<ConnectionSaveOutcome> {
     // migration turns an 'N' into every endpoint disabled.
     canReadOrders: true,
   })
+  if (response.reason === 'HEADERS_NOT_CARRIED') {
+    confirmingHeaderRemoval.value = true
+    return { stay: true }
+  }
+  if (!response.ok || response.errors?.length) return { error: response.errors?.[0] ?? SAVE_FAILED_MESSAGE }
   const message = response.messages?.[0] ?? 'Saved HotWax source config.'
   if (!editing) return { to: '/settings/hotwax', message }
 

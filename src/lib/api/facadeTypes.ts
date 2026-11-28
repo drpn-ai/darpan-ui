@@ -160,6 +160,8 @@ export interface SaveOmsRestSourceConfigPayload {
   username?: string
   password?: string
   apiToken?: string
+  /** Only ever '{}', and only after the user agrees to drop stored headers a moved connection cannot carry (C4). */
+  headersJson?: '{}'
   connectTimeoutSeconds: number
   readTimeoutSeconds: number
   isActive?: boolean

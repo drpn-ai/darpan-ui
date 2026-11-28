@@ -661,7 +661,8 @@ export const settingsFacade = {
     return callService<ListOmsRestSourceConfigsResponse>(SETTINGS.listOmsRestSourceConfigs, payload, signal)
   },
   saveOmsRestSourceConfig(payload: SaveOmsRestSourceConfigPayload, signal?: AbortSignal): Promise<SaveOmsRestSourceConfigResponse> {
-    return callService<SaveOmsRestSourceConfigResponse>(SETTINGS.saveOmsRestSourceConfig, payload, signal)
+    // C4: a refusal carries `reason` (HEADERS_NOT_CARRIED) that the edit page acts on.
+    return callService<SaveOmsRestSourceConfigResponse>(SETTINGS.saveOmsRestSourceConfig, payload, signal, REFUSAL_IS_RESULT)
   },
   deleteOmsRestSourceConfig(payload: DeleteOmsRestSourceConfigPayload, signal?: AbortSignal): Promise<DeleteOmsRestSourceConfigResponse> {
     return callService<DeleteOmsRestSourceConfigResponse>(SETTINGS.deleteOmsRestSourceConfig, payload, signal)

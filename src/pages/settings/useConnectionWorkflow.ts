@@ -11,8 +11,11 @@ import { usePermissionsStore } from '../../stores/permissions'
  */
 export const wizardNextTestId = 'wizard-next'
 
-/** Where a save lands, with the server's message; or an error that keeps the user on the page. */
-export type ConnectionSaveOutcome = { to: RouteLocationRaw; message?: string } | { error: string }
+/**
+ * Where a save lands, with the server's message; or an error that keeps the user on the page; or `stay` when the page
+ * asks the user something first and shows no notice.
+ */
+export type ConnectionSaveOutcome = { to: RouteLocationRaw; message?: string } | { error: string } | { stay: true }
 
 export interface UseConnectionWorkflowOptions<TStep extends WorkflowStep> {
   /** The record being edited (a route param); blank while creating. */
@@ -131,6 +134,7 @@ export function useConnectionWorkflow<TStep extends WorkflowStep>(options: UseCo
     success.value = null
     try {
       const outcome = await options.save()
+      if ('stay' in outcome) return
       if ('error' in outcome) {
         error.value = outcome.error
         return

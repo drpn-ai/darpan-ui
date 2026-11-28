@@ -861,4 +861,104 @@ describe('OmsRestSourceWorkflowPage', () => {
       enabledSystemEnumIds: ['OMS_GQL', 'OMS_RETURNS_GQL'],
     })
   })
+
+  // C4 (darpan-hotwax 216da11): an edit that moves the base URL or auth type does not carry stored custom headers to
+  // the new place. The save answers reason HEADERS_NOT_CARRIED; the page asks before it sends {} to remove them.
+  describe('stored headers on a moved connection', () => {
+    const notCarried = {
+      ok: false,
+      messages: [],
+      errors: ['Enter the custom headers again: the base URL or auth type changed, so the stored ones are not sent to the new place. Send {} to remove them.'],
+      reason: 'HEADERS_NOT_CARRIED',
+    }
+
+    async function editAndMove() {
+      route.params = { omsRestSourceConfigId: 'dev_oms' }
+      route.name = 'settings-oms-edit'
+      route.fullPath = '/settings/hotwax/edit/dev_oms'
+      listOmsRestSourceConfigs.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        omsRestSourceConfigs: [
+          {
+            omsRestSourceConfigId: 'dev_oms',
+            description: 'Dev HotWax',
+            companyUserGroupId: 'KREWE',
+            baseUrl: 'https://oms.example.com',
+            authType: 'NONE',
+            hasUsername: false,
+            hasPassword: false,
+            hasApiToken: false,
+            customHeaderNames: ['X-Tenant'],
+            connectTimeoutSeconds: 10,
+            readTimeoutSeconds: 20,
+            timeZone: 'America/Chicago',
+            isActive: 'Y',
+          },
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+      })
+      const wrapper = mount(OmsRestSourceWorkflowPage)
+      await flushPromises()
+      await wrapper.get('input[name="baseUrl"]').setValue('https://oms-new.example.com')
+      await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('asks before removing the stored headers, with no error and no save', async () => {
+      saveOmsRestSourceConfig.mockResolvedValue(notCarried)
+      const wrapper = await editAndMove()
+
+      const confirm = wrapper.get('[data-testid="oms-headers-confirm"]')
+      expect(confirm.text()).toContain('This connection has stored headers for its old address. Remove them and save?')
+      expect(wrapper.find('.inline-validation').exists()).toBe(false)
+      expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
+      expect(saveOmsRestSourceConfig.mock.calls[0]?.[0]).not.toHaveProperty('headersJson')
+      expect(push).not.toHaveBeenCalled()
+    })
+
+    it('resends the same save with headersJson {} on yes, then returns to the dashboard', async () => {
+      saveOmsRestSourceConfig.mockResolvedValueOnce(notCarried).mockResolvedValueOnce({ ok: true, messages: ['Saved HotWax source config.'], errors: [] })
+      const wrapper = await editAndMove()
+
+      await wrapper.get('[data-testid="oms-headers-confirm-yes"]').trigger('click')
+      await flushPromises()
+
+      expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(2)
+      expect(saveOmsRestSourceConfig.mock.calls[1]?.[0]).toEqual({ ...saveOmsRestSourceConfig.mock.calls[0]?.[0], headersJson: '{}' })
+      expect(saveOmsRestSourceConfig.mock.calls[1]?.[0]).toMatchObject({ baseUrl: 'https://oms-new.example.com' })
+      expect(wrapper.find('[data-testid="oms-headers-confirm"]').exists()).toBe(false)
+      expect(push).toHaveBeenCalledWith({ name: 'settings-oms-auth', params: { omsRestSourceConfigId: 'dev_oms' } })
+    })
+
+    it('sends nothing on no and keeps the form as it was', async () => {
+      saveOmsRestSourceConfig.mockResolvedValue(notCarried)
+      const wrapper = await editAndMove()
+
+      await wrapper.get('[data-testid="oms-headers-confirm-no"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="oms-headers-confirm"]').exists()).toBe(false)
+      expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
+      expect((wrapper.get('input[name="baseUrl"]').element as HTMLInputElement).value).toBe('https://oms-new.example.com')
+      expect(push).not.toHaveBeenCalled()
+
+      // A later plain save asks again: a no is never remembered as a yes.
+      await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+      await flushPromises()
+      expect(saveOmsRestSourceConfig.mock.calls[1]?.[0]).not.toHaveProperty('headersJson')
+      expect(wrapper.find('[data-testid="oms-headers-confirm"]').exists()).toBe(true)
+    })
+
+    it('shows any other refusal as an error, with no confirm', async () => {
+      saveOmsRestSourceConfig.mockResolvedValue({ ok: false, messages: [], errors: ['Base URL must start with https://.'] })
+      const wrapper = await editAndMove()
+
+      expect(wrapper.find('[data-testid="oms-headers-confirm"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Base URL must start with https://.')
+      expect(push).not.toHaveBeenCalled()
+    })
+  })
 })
