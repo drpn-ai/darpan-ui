@@ -9,6 +9,7 @@
     aria-modal="true"
     aria-labelledby="flowchart-editor-title"
     data-testid="flowchart-editor"
+    v-dialog-focus
     @click.self="emit('cancel')"
     @keydown.esc="emit('cancel')"
   >
@@ -66,6 +67,7 @@ import type { SavedRunSummary } from '../../lib/api/types'
 import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
+import { vDialogFocus } from '../../directives/vDialogFocus'
 
 // DAR-UI-048. One question's editor. A question uses an existing rule (spec A7): which rule answers it,
 // how the question reads, and what its "no" is called. Static-surface controls only (AppSelect, not

@@ -8,6 +8,16 @@ const rules = [
 ] as never[]
 
 describe('FlowchartQuestionEditor', () => {
+  // DAR-OPS-029 U16a (U08): Esc is bound on the dialog, so it has to hold focus from the moment it opens.
+  it('takes focus on open, so Esc closes it without a tab first', async () => {
+    const w = mount(FlowchartQuestionEditor, { props: { rules, draft: { ruleSetId: '', runName: '', noOutcomeLabel: '' }, heading: 'h', canDelete: false }, attachTo: document.body })
+    const dialog = w.get('[data-testid="flowchart-editor"]')
+    expect(document.activeElement).toBe(dialog.element)
+    document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(w.emitted('cancel')).toHaveLength(1)
+    w.unmount()
+  })
+
   it('offers only rules that are not archived', () => {
     const w = mount(FlowchartQuestionEditor, { props: { rules, draft: { ruleSetId: '', runName: '', noOutcomeLabel: '' }, heading: 'First question', canDelete: false } })
     const options = (w.findComponent({ name: 'AppSelect' }).props('options') as { value: string }[]).map((o) => o.value)
