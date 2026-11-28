@@ -322,13 +322,13 @@ describe('TenantSettingsPage', () => {
     const year = new Date().getFullYear()
     listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [
       { peakPeriodId: '2', periodName: 'Later sale', fromDate: `${year}-12-20`, thruDate: `${year}-12-22`, isActive: 'Y', state: 'upcoming' },
-      { peakPeriodId: '1', periodName: 'PEAK Nov 27', fromDate: `${year}-11-27`, thruDate: `${year}-11-27`, isActive: 'Y', state: 'on' },
+      { peakPeriodId: '1', periodName: 'Black Friday', fromDate: `${year}-11-27`, thruDate: `${year}-11-27`, isActive: 'Y', state: 'on' },
       { peakPeriodId: '3', periodName: 'Old sale', fromDate: `${year}-01-01`, thruDate: `${year}-01-03`, isActive: 'Y', state: 'ended' },
     ] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('PEAK Nov 27 · on now')
+    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('Black Friday · on now')
     expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').attributes('aria-label')).toBe('Open peak periods')
   })
 

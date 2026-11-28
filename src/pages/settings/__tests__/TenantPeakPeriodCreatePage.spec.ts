@@ -51,11 +51,11 @@ describe('TenantPeakPeriodCreatePage', () => {
 
   it('takes a one-day period', async () => {
     const w = mount(TenantPeakPeriodCreatePage)
-    await toDates(w, 'PEAK Nov 27')
+    await toDates(w, 'Black Friday')
     await pickDays(w, '2026-11-27', '2026-11-27')
     await form(w).vm.$emit('submit')
     await flushPromises()
-    expect(savePeakPeriod).toHaveBeenCalledWith({ periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: true })
+    expect(savePeakPeriod).toHaveBeenCalledWith({ periodName: 'Black Friday', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: true })
   })
 
   it('says a refusal on the days step and stays there', async () => {

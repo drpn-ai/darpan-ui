@@ -73,9 +73,9 @@ export function peakHoursUntilNotice(until: unknown, tenantTimeZone?: string): s
 }
 
 /**
- * The Tenant Settings value: the period on now, else the soonest upcoming one, with when it is ("PEAK Nov 27 · on now",
- * "Cyber Monday · starts in 3 days"), else "None". DAR-UI-159: its dates are on the period's own page; names usually
- * carry them already ("PEAK Nov 27 · Nov 27 – Nov 27").
+ * The Tenant Settings value: the period on now, else the soonest upcoming one, with when it is ("Black Friday · on now",
+ * "Cyber Monday · starts in 3 days"), else "None". Its dates are on the period's own page (DAR-UI-159), and a name
+ * carries none: the save refuses a dated name (OC190).
  */
 export function peakSettingsValue(periods: PeakPeriodSummary[], today: Date = todayInDisplayTimeZone()): string {
   const on = periods.find((period) => period.state === 'on')

@@ -51,7 +51,7 @@ function gorjana(): void {
       return Promise.resolve({ ...envelope, automations: [], chatSpaces: [],
         syncPair: { ...summary({ syncPairId, allowanceMinutes: 360, pulseEveryMinutes: null, waitingCount: 4, pastAllowanceCount: 12,
           lastPulseStamp: '2026-11-26T11:03:13Z' }), normalAllowanceMinutes: 120, normalPulseEveryMinutes: null,
-        periodName: 'Sale Nov 24-26', lastPulseStatusEnumId: 'SPS_OK' },
+        periodName: 'Early sale', lastPulseStatusEnumId: 'SPS_OK' },
         samplesToday: [{ sampleStamp: '2026-11-26T11:03:13Z', waitingCount: 4, oldestWaitingMinutes: 1301, pastAllowanceCount: 12, statusEnumId: 'SPS_OK' }],
         pastOrders: [{ recordKey: 'K', orderName: '#GOR1', otherSystemId: null, sourceCreatedStamp: null, waitingMinutes: 1301,
           reportedInRunId: null, reportedInSavedRunId: null }] })
@@ -61,8 +61,8 @@ function gorjana(): void {
         normalAllowanceMinutes: 120, normalPulseEveryMinutes: null, periodName: null, lastPulseStatusEnumId: 'SPS_SKIPPED' } })
   })
   listPeakPeriods.mockResolvedValue({ ...envelope, peakPeriods: [
-    { peakPeriodId: 'P1', periodName: 'Sale Nov 24-26', fromDate: '2026-11-24', thruDate: '2026-11-26', isActive: 'Y', state: 'on' },
-    { peakPeriodId: 'P2', periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: 'Y', state: 'upcoming' },
+    { peakPeriodId: 'P1', periodName: 'Early sale', fromDate: '2026-11-24', thruDate: '2026-11-26', isActive: 'Y', state: 'on' },
+    { peakPeriodId: 'P2', periodName: 'Black Friday', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: 'Y', state: 'upcoming' },
   ] })
   getPeakPeriod.mockImplementation(({ peakPeriodId }: { peakPeriodId: string }) => Promise.resolve({ ...envelope, syncRows: peakPeriodId === 'P1'
     ? [{ syncPairId: '100000', label: '', normalAllowanceMinutes: 120, periodAllowanceMinutes: 360, normalPulseMinutes: null, periodPulseMinutes: 0 },
@@ -114,12 +114,12 @@ describe('PulsesPage', () => {
   it('names a period that is on and turns a pulse on, with its dates, linked to its page', async () => {
     gorjana()
     listPeakPeriods.mockResolvedValue({ ...envelope, peakPeriods: [
-      { peakPeriodId: 'P2', periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: 'Y', state: 'on' },
+      { peakPeriodId: 'P2', periodName: 'Black Friday', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: 'Y', state: 'on' },
     ] })
     const wrapper = await mountPage()
     const periods = wrapper.findAll('[data-testid="pulses-period"]')
     expect(periods).toHaveLength(1)
-    expect(periods[0]!.text()).toContain('PEAK Nov 27')
+    expect(periods[0]!.text()).toContain('Black Friday')
     expect(periods[0]!.text()).toContain('27 Nov')
     expect(periods[0]!.get('a').attributes('data-to')).toContain('"peakPeriodId":"P2"')
   })

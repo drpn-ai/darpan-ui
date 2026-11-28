@@ -67,11 +67,11 @@ describe('peakDateRange', () => {
 
 describe('peakSettingsValue', () => {
   const today = new Date(2026, 10, 27, 9, 0)
-  const on: PeakPeriodSummary = { peakPeriodId: 'PP2', periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27',
+  const on: PeakPeriodSummary = { peakPeriodId: 'PP2', periodName: 'Black Friday', fromDate: '2026-11-27', thruDate: '2026-11-27',
     isActive: 'Y', state: 'on' }
 
   it('names the period on now and says so, without repeating its dates', () => {
-    expect(peakSettingsValue([upcoming('2026-11-30'), on], today)).toBe('PEAK Nov 27 · on now')
+    expect(peakSettingsValue([upcoming('2026-11-30'), on], today)).toBe('Black Friday · on now')
   })
 
   it('names the soonest coming period and when it starts, else None', () => {
