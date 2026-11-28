@@ -34,6 +34,11 @@
   </article>
 </template>
 
+<script lang="ts">
+/** A drafted change still waiting on a person: planned (again) and not yet applied, rejected or reverted. */
+export const OPEN_PROPOSAL_STATUSES: ReadonlySet<string> = new Set(['DRAFT', 'PLANNED', 'STALE'])
+</script>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
@@ -64,7 +69,6 @@ const emit = defineEmits<{
   planned: [{ proposalId: string; plan: PlanAuditChangeResponse }]
 }>()
 
-const OPEN = new Set(['DRAFT', 'PLANNED', 'STALE'])
 const KIND_LABELS: Record<AuditChangeKind, string> = {
   EXCLUSION_FILTER: 'Exclusion',
   STATEMENT_NARROWING: 'Narrower statement',
@@ -98,7 +102,7 @@ const note = ref(props.proposal.statusMessage ?? '')
 const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
 
-const isOpen = computed(() => OPEN.has(status.value))
+const isOpen = computed(() => OPEN_PROPOSAL_STATUSES.has(status.value))
 // A backtest that does not apply to this kind of change (a new statement, a schedule) has nothing to show.
 const backtest = computed(() => {
   const value = plan.value?.backtest ?? props.proposal.backtest
@@ -133,7 +137,7 @@ const shown = computed(() => {
 function schedule(state: Record<string, unknown> | null | undefined): string {
   const value = state?.schedule as { active?: boolean; time?: string; timeZone?: string } | undefined
   if (!value) return 'Nothing'
-  if (value.active === false) return value.time ? `Off (${value.time}, ${value.timeZone ?? ''})`.replace(', )', ')') : 'Off'
+  if (value.active === false) return value.time ? `Off (${[value.time, value.timeZone].filter(Boolean).join(', ')})` : 'Off'
   return `Every day at ${value.time ?? '—'}${value.timeZone ? `, ${value.timeZone}` : ''}`
 }
 

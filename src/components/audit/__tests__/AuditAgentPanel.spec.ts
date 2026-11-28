@@ -196,6 +196,16 @@ describe('AuditAgentPanel', () => {
     expect(window.localStorage.getItem(agentConversationKey('TEN_A', 'month-close'))).toBeNull()
   })
 
+  // DAR-OPS-029 U05b. Only the server saying the conversation is gone forgets it; an unreachable server keeps the id and says so.
+  it('keeps the conversation and says so when the server cannot be reached', async () => {
+    window.localStorage.setItem(agentConversationKey('TEN_A', 'month-close'), 'C9')
+    getAgentConversation.mockRejectedValueOnce(new ApiCallError('Darpan cannot be reached right now.', 503))
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(window.localStorage.getItem(agentConversationKey('TEN_A', 'month-close'))).toBe('C9')
+    expect(wrapper.get('[data-testid="agent-error"]').text()).toContain('Darpan cannot be reached right now.')
+  })
+
   // DAR-UI-105: drafted changes sit in the thread as cards.
   const draft = { proposalId: 'P1', kind: 'EXCLUSION_FILTER' as const, status: 'DRAFT', statusMessage: null, provenanceStatus: 'SUPPORTED', blockedIds: null, backtest: null }
 

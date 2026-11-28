@@ -117,7 +117,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
-import ProposalCard from './ProposalCard.vue'
+import ProposalCard, { OPEN_PROPOSAL_STATUSES } from './ProposalCard.vue'
 import { agentFacade } from '../../lib/api/facade'
 import { ApiCallError } from '../../lib/api/client'
 import type { AgentProposal, AgentQuestion, AgentTurnOutcome, PlanAuditChangeResponse } from '../../lib/api/agentTypes'
@@ -171,7 +171,6 @@ const plans = ref<Record<string, PlanAuditChangeResponse>>({})
 const approveHint = ref('')
 // DAR-UI-105: typing an approval never applies anything; the card it means is pointed at instead.
 const TYPED_APPROVAL = /^\s*(?:yes[\s,.!]*)?(?:approve|apply|accept|go ahead|do it|ok(?:ay)?|yes)\b/i
-const OPEN_STATUSES = new Set(['DRAFT', 'PLANNED', 'STALE'])
 let sequence = 0
 const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
@@ -184,7 +183,7 @@ const shownMessages = computed(() => messages.value.filter((message) => message.
 const about = computed(() => ['About', [props.findingId, props.auditName || props.auditCode].filter(Boolean).join(' · ')].join(' '))
 const previews = computed<DraftPreview[]>(() => proposals.value.flatMap((proposal) => {
   const plan = plans.value[proposal.proposalId]
-  if (!plan || !OPEN_STATUSES.has(proposal.status)) return []
+  if (!plan || !OPEN_PROPOSAL_STATUSES.has(proposal.status)) return []
   return [{ proposalId: proposal.proposalId, kind: proposal.kind, before: plan.before, after: plan.after, backtest: plan.backtest ?? proposal.backtest }]
 }))
 watch(previews, (next) => emit('preview', next), { immediate: true })
@@ -223,7 +222,7 @@ function onProposalChanged(change: { proposalId: string; status: string }): void
     appliedCount.value += 1
     emit('applied')
   }
-  if (!OPEN_STATUSES.has(change.status) && highlightedId.value === change.proposalId) {
+  if (!OPEN_PROPOSAL_STATUSES.has(change.status) && highlightedId.value === change.proposalId) {
     highlightedId.value = ''
     approveHint.value = ''
   }
@@ -260,17 +259,19 @@ async function reload(): Promise<void> {
     }))
     proposals.value = []
     mergeProposals(conversation.proposals)
-  } catch {
+  } catch (loadError) {
     if (abort.signal.aborted) return
-    // Gone, or not this person's: start a new one on the next message.
-    writeStored(null)
+    // The server answered that it is gone, or not this person's: start a new one on the next message. Unreachable or
+    // failing (5xx), it may still be there: keep the id for the next visit and say why the thread is empty.
+    if (loadError instanceof ApiCallError && (loadError.status ?? 0) >= 500) error.value = loadError.message
+    else writeStored(null)
   }
 }
 
 async function send(text: string, typed = false): Promise<void> {
   const words = text.trim()
   if (!words || sending.value) return
-  const waiting = [...proposals.value].reverse().find((proposal) => OPEN_STATUSES.has(proposal.status))
+  const waiting = [...proposals.value].reverse().find((proposal) => OPEN_PROPOSAL_STATUSES.has(proposal.status))
   if (typed && waiting && words.length <= 40 && TYPED_APPROVAL.test(words)) {
     highlightedId.value = waiting.proposalId
     approveHint.value = 'Approve it on the card.'
