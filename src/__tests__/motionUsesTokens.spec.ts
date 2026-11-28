@@ -21,7 +21,6 @@ const ALLOWED: ReadonlyArray<readonly [string, string, string]> = [
   ['src/style.css', 'opacity 500ms linear', 'mascot bubble release; equals RELEASE_MS in useMascotDwell.ts'],
   ['src/style.css', '0.01ms !important', 'the prefers-reduced-motion collapse itself'],
   ['src/components/ui/LoadingState.vue', 'loading-state-hop 1s ease-in-out infinite', 'progress loop, not a state change'],
-  ['src/components/reconciliation/RuleSetBoard.vue', 'ruleset-ghost-crawl 1.5s linear infinite', 'progress loop, not a state change'],
 ]
 
 const DECLARATION = /(?<![\w-])(transition|animation)(-duration|-timing-function)?\s*:\s*([^;}]+)/g

@@ -57,11 +57,13 @@
       {{ GHOST_RULE_CAPTION }}
     </p>
 
+    <!-- Each column's test id is spelled out, not built from `side`: it is a mascot hint anchor, and the hints and the
+         prod mascot seed (DAR-BE-313) find anchors by reading this source. -->
     <section
       v-for="side in RULE_SIDES"
       :key="side"
       :class="['ruleset-field-column', side === 'file1' ? 'ruleset-field-column--left' : 'ruleset-field-column--right']"
-      :data-testid="`ruleset-field-list-${side}`"
+      :data-testid="side === 'file1' ? 'ruleset-field-list-file1' : 'ruleset-field-list-file2'"
     >
       <header>
         <span>{{ sideTitle(side) }}</span>
