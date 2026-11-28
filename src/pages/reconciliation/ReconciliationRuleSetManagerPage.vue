@@ -324,6 +324,7 @@ import {
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
   reconciliationSystemTitle,
+  SOURCE_TYPE_API,
 } from '../../lib/reconciliationRuleSetDraft'
 import { buildReconciliationDiffRoute, buildReconciliationRunHistoryRoute } from '../../lib/reconciliationRoutes'
 import {
@@ -374,8 +375,6 @@ interface AuthInfoPopupState {
   loading: boolean
   error: string | null
 }
-
-const SOURCE_TYPE_API = 'AUT_SRC_API'
 
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)

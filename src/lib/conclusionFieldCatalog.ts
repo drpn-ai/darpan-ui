@@ -1,6 +1,6 @@
 import { jsonSchemaFacade } from './api/facade'
 import type { RunConclusionLookup } from './api/authoringTypes'
-import type { ReconciliationRuleSetDraft } from './reconciliationRuleSetDraft'
+import { draftSideValue, SOURCE_TYPE_API, type ReconciliationDraftSide, type ReconciliationRuleSetDraft } from './reconciliationRuleSetDraft'
 
 // DAR-UI-135. The fields a conclusion line can check, for the "What is checked" picker.
 
@@ -26,8 +26,6 @@ export interface SideLabels {
   file2: string
 }
 
-const SOURCE_TYPE_API = 'AUT_SRC_API'
-
 function entry(subject: CatalogSubject, field: string, labels: SideLabels, list: boolean): CatalogField {
   const side = subject === 'FILE_1' ? labels.file1 : labels.file2
   return { value: `${subject}:${field}`, label: `${side} › ${field}`, subject, field, list }
@@ -40,18 +38,16 @@ function normalisePath(fieldPath: string): string {
 
 async function sideFields(
   draft: ReconciliationRuleSetDraft,
-  side: 'file1' | 'file2',
+  side: ReconciliationDraftSide,
   signal: AbortSignal,
   labels: SideLabels,
 ): Promise<CatalogResult> {
   const empty: CatalogResult = { fields: [], listPaths: new Set(), nonListPaths: new Set() }
-  const isOne = side === 'file1'
-  const sourceType = isOne ? draft.file1SourceTypeEnumId : draft.file2SourceTypeEnumId
-  if (sourceType === SOURCE_TYPE_API) return empty
+  if (draftSideValue(draft, side, 'SourceTypeEnumId') === SOURCE_TYPE_API) return empty
 
-  let schemaId = (isOne ? draft.file1JsonSchemaId : draft.file2JsonSchemaId)?.trim() ?? ''
+  let schemaId = draftSideValue(draft, side, 'JsonSchemaId')?.trim() ?? ''
   if (!schemaId) {
-    const schemaName = (isOne ? draft.file1SchemaFileName : draft.file2SchemaFileName)?.trim()
+    const schemaName = draftSideValue(draft, side, 'SchemaFileName')?.trim()
     if (!schemaName) return empty
     const response = await jsonSchemaFacade.get({ schemaName }, signal)
     schemaId = response.schemaData?.jsonSchemaId?.trim() ?? ''
@@ -59,7 +55,7 @@ async function sideFields(
   }
 
   const response = await jsonSchemaFacade.flatten({ jsonSchemaId: schemaId }, signal)
-  const subject: CatalogSubject = isOne ? 'FILE_1' : 'FILE_2'
+  const subject: CatalogSubject = side === 'file1' ? 'FILE_1' : 'FILE_2'
   const entries = (response.fieldList ?? [])
     .map((f) => ({ path: normalisePath(f.fieldPath), type: f.type }))
     .filter((f) => f.path)

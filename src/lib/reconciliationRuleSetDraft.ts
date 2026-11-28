@@ -7,7 +7,8 @@ import type { SavedRunRule } from './api/types'
 import { excludeFilterPayloadFields, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { normalizeString } from './utils/strings'
 
-const RULESET_SOURCE_TYPE_API = 'AUT_SRC_API'
+/** A side read from an API connector rather than an uploaded file. */
+export const SOURCE_TYPE_API = 'AUT_SRC_API'
 
 /**
  * Every card in the create-reconciliation wizard. Lives here rather than in the page because a
@@ -263,14 +264,14 @@ const API_SIDE_FIELDS = ['SystemMessageRemoteId', 'NsRestletConfigId', 'SourceCo
 
 function buildSideSourceFields(side: ReconciliationDraftSide, draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
   const primaryIdFields = primaryIdExpressionPayloadFields(draftSideValue(draft, side, 'PrimaryIdExpression'), side)
-  if (draftSideValue(draft, side, 'SourceTypeEnumId') === RULESET_SOURCE_TYPE_API) {
+  if (draftSideValue(draft, side, 'SourceTypeEnumId') === SOURCE_TYPE_API) {
     // An API side sends only what it has: a blank id or an empty single key is left out.
     const named = API_SIDE_FIELDS.flatMap((field) => {
       const value = draftSideValue(draft, side, field)?.trim()
       return value ? [[`${side}${field}`, value]] : []
     })
     const keys = Object.entries(primaryIdFields).filter(([, value]) => Boolean(value))
-    return Object.fromEntries([[`${side}SourceTypeEnumId`, RULESET_SOURCE_TYPE_API], ...named, ...keys]) as Partial<CreateRuleSetRunPayload>
+    return Object.fromEntries([[`${side}SourceTypeEnumId`, SOURCE_TYPE_API], ...named, ...keys]) as Partial<CreateRuleSetRunPayload>
   }
   return {
     [`${side}FileTypeEnumId`]: draftSideValue(draft, side, 'FileTypeEnumId'),
