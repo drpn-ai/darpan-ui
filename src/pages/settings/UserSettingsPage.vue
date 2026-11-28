@@ -371,7 +371,7 @@
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
           class="workflow-form--popup-compact"
-          :question="passwordStepQuestion"
+          :question="passwordStep.question"
           :primary-label="passwordPrimaryLabel"
           :submit-disabled="isPasswordStepBlocked"
           :show-back="passwordStepIndex > 0"
@@ -381,13 +381,13 @@
           @back="goBackPasswordStep"
           @submit="submitPasswordStep"
         >
-          <label class="workflow-context-block" :aria-label="passwordStepLabel">
+          <label class="workflow-context-block" :aria-label="passwordStep.label">
             <input
               v-model="passwordStepValue"
               class="wizard-answer-control"
-              :name="passwordStepName"
+              :name="passwordStep.name"
               type="password"
-              :autocomplete="passwordStepAutocomplete"
+              :autocomplete="passwordStep.autocomplete"
               required
             />
           </label>
@@ -597,9 +597,8 @@ const isTimezoneWorkflowOpen = ref(false)
 const isSavingUserTimezone = ref(false)
 const userTimezoneSaveError = ref<string | null>(null)
 const timezoneForm = ref({ timeZone: '' })
-// Confirmed/displayed value, updated directly on a successful save (mirrors
-// savedDisplayNameInput below) rather than re-derived from sessionInfo -- keeps the summary
-// in lockstep with what was actually persisted without depending on session refresh timing.
+// Confirmed/displayed value, updated directly on a successful save rather than re-derived from sessionInfo: keeps the
+// summary in lockstep with what was persisted without depending on session refresh timing.
 const savedUserTimeZone = ref('')
 const passwordForm = ref({
   currentPassword: '',
@@ -690,10 +689,6 @@ const chatSpaceChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   }))
 })
 const passwordStep = computed(() => passwordSteps[passwordStepIndex.value] ?? passwordSteps[0])
-const passwordStepQuestion = computed(() => passwordStep.value.question)
-const passwordStepLabel = computed(() => passwordStep.value.label)
-const passwordStepName = computed(() => passwordStep.value.name)
-const passwordStepAutocomplete = computed(() => passwordStep.value.autocomplete)
 const passwordPrimaryLabel = computed(() => {
   if (passwordStep.value.name === 'currentPassword' && isVerifyingCurrentPassword.value) return 'Checking'
   return passwordStepIndex.value === passwordSteps.length - 1 ? (isChangingPassword.value ? 'Changing' : 'Change') : 'OK'
@@ -772,7 +767,7 @@ function closePasswordWorkflow(): void {
   }
 }
 
-function handlePasswordWorkflowCancelRequest(event: Event): void {
+function handleCancelRequest(event: Event): void {
   if (isRecoveryEmailWorkflowOpen.value) {
     event.preventDefault()
     closeRecoveryEmailWorkflow()
@@ -911,13 +906,14 @@ function showPasswordWorkflowWarning(message: string): void {
 
 async function submitPasswordChange(): Promise<void> {
   if (isChangingPassword.value) return
+  // The popup stays open on a refusal, and a page-level note would sit behind its scrim: the hint says it on top.
   if (passwordForm.value.newPassword !== passwordForm.value.newPasswordVerify) {
-    passwordMessage.value = 'New passwords do not match.'
+    showPasswordWorkflowWarning('New passwords do not match.')
     return
   }
 
   isChangingPassword.value = true
-  passwordMessage.value = 'Changing password'
+  passwordMessage.value = null
   try {
     const changed = await authStore.changeOwnPassword({
       currentPassword: passwordForm.value.currentPassword,
@@ -934,7 +930,7 @@ async function submitPasswordChange(): Promise<void> {
       passwordStepIndex.value = 0
       passwordMessage.value = 'Password changed.'
     } else {
-      passwordMessage.value = authStore.error ?? 'Unable to change password.'
+      showPasswordWorkflowWarning(authStore.error || 'Unable to change password.')
     }
   } finally {
     isChangingPassword.value = false
@@ -1048,10 +1044,6 @@ async function loadMyCliAccess() {
   }
 }
 
-watch(activeTenantUserGroupId, (next, previous) => {
-  if (next && previous && next !== previous) void loadMyCliAccess()
-})
-
 async function loadCliSessions() {
   try {
     const response = await authFacade.listCliSessions(pageAbortController.signal)
@@ -1146,10 +1138,7 @@ const isPopupOpen = computed(() => (
   || isManagePasskeysOpen.value
   || twoFactorAction.value !== null
 ))
-const recoveryCodesLeftLabel = computed(() => {
-  const left = twoFactorStatus.value?.recoveryCodesLeft ?? 0
-  return left === 1 ? '1 left' : `${left} left`
-})
+const recoveryCodesLeftLabel = computed(() => `${twoFactorStatus.value?.recoveryCodesLeft ?? 0} left`)
 
 async function loadTwoFactorStatus(): Promise<void> {
   try {
@@ -1241,7 +1230,7 @@ async function handleTwoFactorChanged(change: TwoFactorSettingsChange): Promise<
 }
 
 onMounted(() => {
-  document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
+  document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
   void loadTwoFactorStatus()
   void loadNotificationDefault()
   void loadCliSessions()
@@ -1249,7 +1238,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
+  document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
   pageAbortController.abort()
 })
 </script>

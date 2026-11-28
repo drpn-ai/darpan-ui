@@ -471,6 +471,38 @@ describe('UserSettingsPage', () => {
     }
   })
 
+  it('says a mismatch or a refused change where the person is looking, not behind the popup', async () => {
+    // The page-level note sat under the popup's scrim while the popup stayed open: the refusal was never seen.
+    const warnings: CustomEvent[] = []
+    const capture = (event: Event) => warnings.push(event as CustomEvent)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, capture)
+    try {
+      const wrapper = mountPage()
+      const step = async (name: string, value: string) => {
+        await wrapper.get(`input[name="${name}"]`).setValue(value)
+        await wrapper.get('form.wizard-question-shell').trigger('submit')
+        await flushPromises()
+      }
+      await wrapper.get('.user-settings-password-trigger').trigger('click')
+      await step('currentPassword', 'old-password')
+      await step('newPassword', 'new-password')
+      await step('newPasswordVerify', 'other-password')
+      expect(changeOwnPassword).not.toHaveBeenCalled()
+      expect(warnings.map((event) => event.detail.message)).toEqual(['New passwords do not match.'])
+      expect(wrapper.get('[role="dialog"]').text()).toContain('Enter your new password again.')
+
+      changeOwnPassword.mockImplementationOnce(async () => {
+        authState.error = 'Password was used recently.'
+        return false
+      })
+      await step('newPasswordVerify', 'new-password')
+      expect(warnings.map((event) => event.detail.message)).toEqual(['New passwords do not match.', 'Password was used recently.'])
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, capture)
+    }
+  })
+
   it('closes the password workflow through the shared workflow cancel request', async () => {
     const wrapper = mountPage()
 
