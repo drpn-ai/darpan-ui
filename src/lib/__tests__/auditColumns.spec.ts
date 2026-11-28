@@ -412,8 +412,10 @@ describe('auditColumns', () => {
       cause: 'Backordered in NetSuite', stuck: ['F-1'], lines }
     const none = { q: '', cause: '', age: 0 }
     expect(matchesFindingFilters(order, { ...none, q: 'M1168785/02' })).toBe(true)
-    expect(matchesFindingFilters(order, { ...none, cause: 'Shipped, not billed: another line of its order is backordered in NetSuite' })).toBe(true)
-    expect(causeOptions([order])).toEqual(['Backordered in NetSuite', 'Shipped, not billed: another line of its order is backordered in NetSuite'])
+    // DAR-UI-098 / DAR-OPS-029 F20: a held line's cause is not its order's while the line holding it is listed.
+    expect(matchesFindingFilters(order, { ...none, cause: 'Backordered in NetSuite' })).toBe(true)
+    expect(matchesFindingFilters(order, { ...none, cause: 'Shipped, not billed: another line of its order is backordered in NetSuite' })).toBe(false)
+    expect(causeOptions([order])).toEqual(['Backordered in NetSuite'])
   })
 
   it('reads counts and filters in words', () => {
@@ -466,6 +468,32 @@ describe('auditColumns', () => {
     // The toolbar's cause filter heads an order by the cause picked, so it never shows under another heading.
     expect(findingRows([mixed, stuckFirst], 'Backordered').map((r) => `${r.cause} · ${r.item.id} · ${rowAlsoLabel(r)}`))
       .toEqual([`Backordered · M1211771 · Also ${shipped} · 3 lines`, `Backordered · M1211800 · Also ${shipped} · 2 lines`])
+  })
+
+  // DAR-OPS-029 U05a F20. A held line's cause ("another line is backordered") is not a cause of its order while the line
+  // holding it is listed, so the cause picker never offers it and picking it never lists the order under another heading.
+  // When no line holding it is listed (every cause-bearing line is held), the held cause is the only one the order has: the
+  // backend heads the order by it too (AuditReportAssembler.unitFinding), and the board does, so the picker offers it.
+  it('filters and offers an order\'s causes as its headings name them, never a held line\'s beside its holder', () => {
+    const line = (id: string, cause: string | null, held = false) => ({ id, headline: '', state: 'open', firstFound: '', ageDays: 0,
+      difference: null, next: '', records: {}, cause, held }) as NonNullable<AuditFindingListItem['lines']>[number]
+    const order = (id: string, lines: ReturnType<typeof line>[], cause: string | null) =>
+      ({ id, kind: 'order', order: id, headline: `Order ${id}: ${lines.length} lines`, state: 'open', firstFound: '', ageDays: 0,
+        difference: null, next: '', records: {}, statement: 'R1', category: 'orders', cause, stuck: [], lines }) as AuditFindingListItem
+    const waits = 'Shipped, not billed: another line is backordered'
+    const holder = order('M1', [line('F-1', 'Backordered'), line('F-2', waits, true)], 'Backordered')
+    const orphan = order('M2', [line('F-3', waits, true), line('F-4', waits, true)], waits)
+    const none = { q: '', cause: '', age: 0 }
+    expect(causeOptions([holder])).toEqual(['Backordered'])
+    expect(matchesFindingFilters(holder, { ...none, cause: waits })).toBe(false)
+    expect(matchesFindingFilters(holder, { ...none, cause: 'Backordered' })).toBe(true)
+    expect(orderCauses(orphan)).toEqual([{ cause: waits, lines: 2 }])
+    expect(causeOptions([holder, orphan])).toEqual(['Backordered', waits])
+    // Whatever the picker offers, every order it keeps sits under that heading.
+    for (const cause of causeOptions([holder, orphan])) {
+      const kept = [holder, orphan].filter((item) => matchesFindingFilters(item, { ...none, cause }))
+      expect(findingRows(kept, cause).map((row) => row.cause)).toEqual(kept.map(() => cause))
+    }
   })
 
   // A finding written before its cause was renamed heads by the cause's new words, beside one written after.

@@ -561,11 +561,19 @@ export interface FindingRow<T extends AuditFindingSummary = AuditFindingSummary>
 // are its lines' own causes (a line held by another one's cause is not a cause of its own), each with how many of its lines
 // it covers; an order whose lines name none falls back to its own cause, then what its headline says. Never a "no cause".
 // The heading cause comes first: the stuck line's (what holds the order up), else the one on most lines, a tie to the first.
-export function orderCauses(item: AuditFindingSummary): { cause: string; lines: number }[] {
+// When every line naming a cause is held, no line holding them is listed: their cause is the order's only one (the backend
+// heads the order by it too, AuditReportAssembler.unitFinding), so it counts.
+function lineCauseCounts(item: AuditFindingSummary): Map<string, number> {
   const lines = item.kind === 'order' ? (item.lines ?? []) : []
   const own = lines.filter((line) => !line.held && line.cause)
   const counts = new Map<string, number>()
   ;(own.length ? own : lines.filter((line) => line.cause)).forEach((line) => counts.set(line.cause!, (counts.get(line.cause!) ?? 0) + 1))
+  return counts
+}
+
+export function orderCauses(item: AuditFindingSummary): { cause: string; lines: number }[] {
+  const lines = item.kind === 'order' ? (item.lines ?? []) : []
+  const counts = lineCauseCounts(item)
   if (!counts.size) return [{ cause: causeHeading(item), lines: lines.length }]
   const stuck = lines.find((line) => item.stuck?.includes(line.id) && line.cause && counts.has(line.cause))?.cause
   return [...counts].map(([cause, n]) => ({ cause, lines: n }))
@@ -637,8 +645,11 @@ export function matchesFindingFilters(item: AuditFindingListItem, filters: Findi
     .some((text) => (text ?? '').toLowerCase().includes(q))
 }
 
+// DAR-UI-098. The causes the board can head the finding by (findingRows): an order's lines' own, a held line's only when no
+// line holding it is listed, so a picked cause never lists a row under another heading.
 function findingCauses(item: AuditFindingListItem): string[] {
-  return [item.cause, ...(item.lines ?? []).map((line) => line.cause)].filter((cause): cause is string => Boolean(cause))
+  const lines = [...lineCauseCounts(item).keys()]
+  return lines.length ? lines : item.cause ? [item.cause] : []
 }
 
 /**
