@@ -292,9 +292,13 @@ describe('ShopifyAuthWorkflowPage', () => {
     expect(orderEndpointCheckbox.attributes('name')).toBe('endpoint-SHOPIFY')
     expect((orderEndpointCheckbox.element as HTMLInputElement).checked).toBe(true)
     expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Admin GraphQL Orders')
-    expect(wrapper.get('input[name="isActive"]').attributes('type')).toBe('checkbox')
-    expect(wrapper.get('input[name="isActive"]').classes()).toContain('app-table__checkbox')
-    expect((wrapper.get('input[name="isActive"]').element as HTMLInputElement).checked).toBe(true)
+    // S99-107: a Yes/No select, as on the NetSuite connection forms, not a checkbox.
+    expect(wrapper.get('[data-testid="shopify-is-active"]').text()).toContain('Yes')
+    expect(wrapper.find('input[name="isActive"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="shopify-is-active"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="N"]').trigger('click')
+    expect(wrapper.get('[data-testid="shopify-is-active"]').text()).toContain('No')
   })
 
   it('returns to the selected Shopify config dashboard after saving an edit', async () => {

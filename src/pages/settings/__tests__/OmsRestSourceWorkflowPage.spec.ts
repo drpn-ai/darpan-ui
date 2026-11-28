@@ -356,9 +356,9 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Orders')
     expect(wrapper.find('input[name="apiToken"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="oms-is-active"]').exists()).toBe(true)
-    expect(wrapper.get('input[name="isActive"]').attributes('type')).toBe('checkbox')
-    expect(wrapper.get('input[name="isActive"]').classes()).toContain('app-table__checkbox')
-    expect((wrapper.get('input[name="isActive"]').element as HTMLInputElement).checked).toBe(true)
+    // S99-107: a Yes/No select, as on the NetSuite connection forms, not a checkbox.
+    expect(wrapper.get('[data-testid="oms-is-active"]').text()).toContain('Yes')
+    expect(wrapper.find('input[name="isActive"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Orders Path')
     expect(wrapper.text()).not.toContain('Headers JSON')
     expect(wrapper.text()).not.toContain('Connect Timeout')
@@ -860,6 +860,33 @@ describe('OmsRestSourceWorkflowPage', () => {
       configId: 'krewe-oms',
       enabledSystemEnumIds: ['OMS_GQL', 'OMS_RETURNS_GQL'],
     })
+  })
+
+  it('saves a connection switched off through the Active select', async () => {
+    route.params = { omsRestSourceConfigId: 'dev_oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/dev_oms'
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [{
+        omsRestSourceConfigId: 'dev_oms', description: 'Dev HotWax', companyUserGroupId: 'KREWE', baseUrl: 'https://oms.example.com',
+        authType: 'NONE', hasUsername: false, hasPassword: false, hasApiToken: false, customHeaderNames: [],
+        connectTimeoutSeconds: 10, readTimeoutSeconds: 20, timeZone: 'America/Chicago', isActive: 'Y',
+      }],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    saveOmsRestSourceConfig.mockResolvedValue({ ok: true, messages: ['Saved HotWax source config.'], errors: [] })
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="oms-is-active"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="N"]').trigger('click')
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }))
   })
 
   // C4 (darpan-hotwax 216da11): an edit that moves the base URL or auth type does not carry stored custom headers to

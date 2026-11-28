@@ -826,9 +826,11 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(authSource).toContain('<AppSelect')
     expect(authSource).not.toContain('<select')
     expect(shopifySource).toContain('<AppSelect')
-    expect(shopifySource).toContain('class="app-table__checkbox"')
+    // S99-107: Active is a Yes/No select on both connection forms, as on NetSuite's (it was a checkbox here).
+    expect(shopifySource).toMatch(/<AppSelect\s+v-model="form\.isActive"/)
     expect(shopifySource).not.toContain('<select')
     expect(omsSource).toContain('<AppSelect')
+    expect(omsSource).toMatch(/<AppSelect\s+v-model="form\.isActive"/)
     expect(omsSource).toContain('<WorkflowShortcutChoiceCards')
     expect(omsSource).not.toContain('<select')
     expect(schemaEditorSource).toContain('<AppSelect')

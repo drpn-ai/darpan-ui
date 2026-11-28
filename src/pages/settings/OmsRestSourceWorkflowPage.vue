@@ -64,13 +64,10 @@
 
           <label class="wizard-input-shell">
             <span v-explain="'connectionActive'" class="workflow-context-label">Active</span>
-            <input
-              v-model="isActiveChecked"
-              name="isActive"
-              class="app-table__checkbox"
-              type="checkbox"
-              data-testid="oms-is-active"
-              aria-label="Active"
+            <AppSelect
+              v-model="form.isActive"
+              :options="yesNoOptions"
+              test-id="oms-is-active"
             />
           </label>
         </div>
@@ -282,12 +279,11 @@ const form = reactive<OmsForm>(createDefaultOmsForm())
 // a Save clicked before the panel's first emit ever arrives is treated the same as an in-flight or
 // failed read -- never as an implicit "everything disabled".
 const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
-const isActiveChecked = computed({
-  get: () => form.isActive !== 'N',
-  set: (checked: boolean) => {
-    form.isActive = checked ? 'Y' : 'N'
-  },
-})
+// S99-107: Active is a Yes/No select, as on the NetSuite connection forms.
+const yesNoOptions: AppSelectOption[] = [
+  { value: 'Y', label: 'Yes' },
+  { value: 'N', label: 'No' },
+]
 const isBasicAuth = computed(() => form.authType === 'BASIC')
 const isApiKeyAuth = computed(() => form.authType === 'API_KEY')
 const isApiTokenAuth = computed(() => form.authType === 'BEARER' || isApiKeyAuth.value)
